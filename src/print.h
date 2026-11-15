@@ -31,6 +31,10 @@ uint16_t screen_blit_masked(uint8_t *ds, uint16_t value_mask, uint16_t addr);
  * er0, which is the caller's to ignore. */
 uint16_t fill_rect_solid(uint8_t *ds, uint16_t xy, uint16_t size);
 uint16_t fill_rect_clear(uint8_t *ds, uint16_t xy, uint16_t size);
+/* 0x09846 - same, but the stacked argument is a pointer to a byte stream: one
+ * byte per written column byte.  A null pointer draws nothing. */
+uint16_t fill_rect_stream(uint8_t *ds, uint16_t xy, uint16_t size,
+                          uint16_t ptr);
 
 /* 0x091E2 / 0x091E6 / 0x091EA - set or clear one pixel in the current buffer.
  * The three entry points share one body: 0x091E2 sets without checking bounds

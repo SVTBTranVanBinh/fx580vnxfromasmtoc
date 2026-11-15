@@ -150,6 +150,39 @@ static void test_fill_rect(void)
     }
 }
 
+/* 0x09846 shares the walk with the solid pair, but its stacked argument is a
+ * pointer to a byte stream rather than a pattern: each written column byte
+ * consumes the next byte, which is how the firmware fills a box with a dotted
+ * or hatched pattern.  The stream is planted in RAM, in the ROM table the
+ * firmware itself uses (0x646E) and nowhere at all (a null pointer, a no-op). */
+static void test_fill_rect_stream(void)
+{
+    static const uint16_t xys[] = {0x0000, 0x0205, 0x1625, 0x3FBF, 0x0A0B};
+    static const uint16_t sizes[] = {0x0101, 0x0E80, 0x1680, 0x0207, 0x4001};
+    static const uint16_t ptrs[] = {0x0000, 0x646E, 0xD600, 0xD6FF, 0xE600};
+
+    for (size_t a = 0; a < sizeof(xys) / sizeof(xys[0]); a++) {
+        for (size_t z = 0; z < sizeof(sizes) / sizeof(sizes[0]); z++) {
+            for (size_t q = 0; q < sizeof(ptrs) / sizeof(ptrs[0]); q++) {
+                for (int mode = 0; mode < 2; mode++) {
+                    Args args = {.er = {xys[a], sizes[z]},
+                                 .stk = {ptrs[q]}, .nstk = 1};
+                    random_image((uint32_t)(a * 733 + z * 59 + q * 7 +
+                                            (size_t)mode * 3 + 41000));
+                    image[0xD138] = (uint8_t)mode;
+                    image[0xD139] = (uint8_t)(mode ? 1 : 0);
+                    uint16_t rom_ret = run_rom(0x09846, &args, "fill_rect_stream");
+                    begin_c();
+                    uint16_t c_ret = fill_rect_stream(after_c, xys[a],
+                                                      sizes[z], ptrs[q]);
+                    check_ret("fill_rect_stream", rom_ret, c_ret);
+                    check_mem_all("fill_rect_stream");
+                }
+            }
+        }
+    }
+}
+
 static void test_screen_addr(void)
 {
     static const uint16_t xys[] = {
@@ -663,6 +696,7 @@ void test_print(void)
     test_screen_blend();
     test_screen_blit_masked();
     test_fill_rect();
+    test_fill_rect_stream();
     test_screen_addr();
     test_screen_pixel();
     test_char_print();

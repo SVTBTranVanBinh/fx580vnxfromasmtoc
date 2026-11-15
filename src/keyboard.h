@@ -33,6 +33,10 @@
 /* 0x09F3A - program the timer for a wait of `interval` ticks. */
 uint16_t timer_delay(uint8_t *ds, uint16_t interval);
 
+/* 0x09F68 - the tail of 0x09F3A as an entry: reload the timer with the
+ * firmware's short interval. */
+uint16_t timer_delay_tail(uint8_t *ds);
+
 /* 0x23C94 - a wait of one tick, then straight back with the caller's er0.
  * 0x23CA4 is its ten-tick twin, but nothing was translated behind that one yet. */
 uint16_t timer_delay_once(uint8_t *ds, uint16_t arg);

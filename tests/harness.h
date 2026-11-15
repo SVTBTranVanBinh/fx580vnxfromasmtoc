@@ -59,6 +59,12 @@ uint16_t run_rom(uint32_t addr, const Args *a, const char *what);
  * reporting a memory mismatch against an all-zero image. */
 uint16_t run_rom_ex(uint32_t addr, const Args *a, const char *what,
                     int *returned);
+/* Run until the program counter reaches `stop` instead of until it returns, for
+ * the routines that end in `b _start` and never come back.  Answers 1 when the
+ * machine got there and 0 (with a printed failure) when it faulted or stayed
+ * too long; after_rom then holds the data space at the moment of the jump. */
+int run_rom_until(uint32_t addr, const Args *a, const char *what,
+                  uint32_t stop);
 void check_ret(const char *what, uint16_t rom_ret, uint16_t c_ret);
 /* Compare the register bytes selected by `mask` (bit N = rN) against the
  * register file the ROM left behind.  `mine` is a 16-byte image the caller

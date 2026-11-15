@@ -512,7 +512,7 @@ uint16_t str_decompress_print(uint8_t *ds, uint16_t str, uint16_t buf,
  * The frame word holds the running address, so the return value is that
  * address after the last advance - the ROM's er0 comes from the same cell. */
 static uint16_t fill_rect_pattern(uint8_t *ds, uint16_t xy, uint16_t size,
-                                  uint16_t pattern)
+                                  uint16_t pattern, uint16_t stream)
 {
     uint8_t x = (uint8_t)xy;
     uint8_t y = (uint8_t)(xy >> 8);
@@ -532,15 +532,6 @@ static uint16_t fill_rect_pattern(uint8_t *ds, uint16_t xy, uint16_t size,
     rows = h;
 
     for (;;) {
-        {
-            /* the pattern's low byte is the one that is shifted: the ROM loads
-             * it into the high half of er12 and shifts that */
-            uint16_t spread = (uint16_t)(((uint16_t)(pattern & 0xFFu) << 8) >>
-                                         bit);
-
-            r13 = (uint8_t)(spread >> 8);
-            r12 = (uint8_t)spread;
-        }
         r15 = ds[MASK_HI_ADDR + bit];
         r14 = ds[FILL_MASK_LO_ADDR + bit];
         written = 0;
@@ -554,6 +545,21 @@ static uint16_t fill_rect_pattern(uint8_t *ds, uint16_t xy, uint16_t size,
                 r14 = (uint8_t)pair;
             }
             written++;
+            /* the pattern's low byte is the one that is shifted: the ROM loads
+             * it into the high half of er12 and shifts that.  A stream pointer
+             * takes one byte per written byte and steps along; anything else
+             * uses the constant the entry supplied. */
+            if (stream != 0) {
+                pattern = ds[stream];
+                stream = (uint16_t)(stream + 1);
+            }
+            {
+                uint16_t spread = (uint16_t)(((uint16_t)(pattern & 0xFFu) << 8) >>
+                                             bit);
+
+                r13 = (uint8_t)(spread >> 8);
+                r12 = (uint8_t)spread;
+            }
             (void)screen_blit_masked(ds, (uint16_t)(((uint16_t)r15 << 8) | r13),
                                      cell);
             cell = (uint16_t)(cell + 1);
@@ -576,13 +582,32 @@ static uint16_t fill_rect_pattern(uint8_t *ds, uint16_t xy, uint16_t size,
 /* 0x09834 - fill the rectangle with ones. */
 uint16_t fill_rect_solid(uint8_t *ds, uint16_t xy, uint16_t size)
 {
-    return fill_rect_pattern(ds, xy, size, 0xFFFFu);
+    return fill_rect_pattern(ds, xy, size, 0xFFFFu, 0);
 }
 
 /* 0x09826 - the same walk with a zero pattern, i.e. a clear. */
 uint16_t fill_rect_clear(uint8_t *ds, uint16_t xy, uint16_t size)
 {
-    return fill_rect_pattern(ds, xy, size, 0x0000u);
+    return fill_rect_pattern(ds, xy, size, 0x0000u, 0);
+}
+
+/* 0x09846 - the third entry of the cluster.  Its stacked argument is a
+ * *pointer* to the fill's byte stream, one byte consumed per written column
+ * byte, and a null pointer goes straight to the epilogue: it draws nothing at
+ * all rather than clearing, which is what 0x09826 is for.  0x09EE8 fills its
+ * title box this way from the ROM table at 0x646E, a dotted pattern the two
+ * constant entries cannot express.
+ *
+ * The body tests the pointer on every written byte, so a stream that walks up
+ * to 0x0000 falls back to the word at 2[sp] - for the constant entries that is
+ * the value they pushed, and for this one it is whatever the stack held.  A
+ * full-screen fill consumes at most 1536 bytes, so starting anywhere below
+ * 0xF900 cannot reach the wrap; the tests stay there. */
+uint16_t fill_rect_stream(uint8_t *ds, uint16_t xy, uint16_t size, uint16_t ptr)
+{
+    if (ptr == 0)
+        return xy;
+    return fill_rect_pattern(ds, xy, size, 0, ptr);
 }
 
 /* 0x20A38 - clear the caller's buffer and copy a fixed two-character constant

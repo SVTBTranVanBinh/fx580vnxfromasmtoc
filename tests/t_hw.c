@@ -331,6 +331,50 @@ static void test_submode_needs_setup(void)
     }
 }
 
+/* 0x09EE8 is the only routine here that does not return: it ends in `b _start`,
+ * a jump into the main loop, so the harness runs the ROM up to the address the
+ * jump lands on and compares what the body wrote before it (`run_rom_until`).
+ *
+ * Its callees also read stack slots they never wrote - the 2[sp] fallback in
+ * 0x09846 and the holes the frames leave - so a stack full of random bytes
+ * sends the ROM off through a `pop pc` that was never pushed (the trace ends in
+ * "code fetch from unmapped segment" at an address that is really data).  The
+ * test pins 0xEC00..0xEFFF and the SFR block to zero, which is what the machine
+ * looks like at boot, and sweeps the rest of the data space. */
+static void test_screen_mode_setup(void)
+{
+    for (unsigned t = 0; t < 8; t++) {
+        random_image(0xD1B000u + t);
+        memset(image + 0xEC00, 0, 0x0400);
+        memset(image + 0xF000, 0, 0x0100);
+        image[0xD0F5] = 0;
+        Args args = {.nstk = 0};
+
+        if (!run_rom_until(0x09EE8, &args, "screen_mode_setup", 0x0A1CE))
+            continue;
+        begin_c();
+        (void)screen_mode_setup(after_c);
+        check_mem_all("screen_mode_setup");
+        check_mem("screen_mode_setup", 0xF000, 0xF100);
+    }
+
+    /* the 0xD0F5 guard is the only way the routine answers at all */
+    {
+        static const uint8_t flags[] = {1, 2, 0x80, 0xFF};
+
+        for (size_t f = 0; f < sizeof(flags); f++) {
+            random_image(0xD1B100u + (unsigned)f);
+            image[0xD0F5] = flags[f];
+            Args args = {.nstk = 0};
+            uint16_t rom_ret = run_rom(0x09EE8, &args, "screen_mode_setup");
+            begin_c();
+            uint16_t c_ret = screen_mode_setup(after_c);
+            check_ret("screen_mode_setup", rom_ret, c_ret);
+            check_mem_all("screen_mode_setup");
+        }
+    }
+}
+
 void test_hw(void)
 {
     test_submode_needs_setup();
@@ -392,4 +436,5 @@ void test_hw(void)
     );
 
     test_pop_pc_return();
+    test_screen_mode_setup();
 }

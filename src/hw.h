@@ -34,6 +34,10 @@ uint16_t set_flag_0F811(uint8_t *ds);
 /* 0x09A24 - read 0xF050 (the diagnostic byte). */
 uint16_t read_0F050(uint8_t *ds);
 
+/* 0x09EE8 - clear, draw the title box and hand control to `_start`; only the
+ * 0xD0F5 guard returns. */
+uint16_t screen_mode_setup(uint8_t *ds);
+
 /* 0x0A128 - drop the whole display state: 0xF800, 0xF801, 0xF803, 0xF812,
  * 0xF811 and 0xF815 all go to zero. */
 uint16_t screen_state_clear(uint8_t *ds);

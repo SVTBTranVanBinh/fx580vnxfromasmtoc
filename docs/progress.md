@@ -52,8 +52,8 @@ on the same partition:
 
 | metric | current |
 | --- | --- |
-| routines | 254 / 761 (33.4%) |
-| instructions | 5345 / 32749 (16.3%) |
+| routines | 255 / 761 (33.5%) |
+| instructions | 5373 / 32749 (16.4%) |
 
 (Measured with `python3 tools/coverage.py`; the instruction total counts the
 ret/rt-delimited bodies the tooling treats as one routine each, not every word
@@ -96,6 +96,8 @@ the core manual (`resource/nX-U8100 Core Instruction Manual.txt`) or against
 | a `bl` into a `.l_NNN` is not a call to the routine it belongs to | `bl 0x0A0D4` enters `0x0A0AA` at its *last two* instructions, `st r0, [0xF032]; rt` - the `mov r0, 20` that the whole routine uses sits one instruction before the label.  Writing 20 to the contrast there is wrong by a whole byte: the store takes whatever r0 the caller happened to hold (`0x09A6A` loads 0xD153 two instructions earlier) |
 | a record slid through a staging window | `0x1BCDE`/`0x1BD68`/`0x1BE00` stage the ten-byte record at `0xD03C` behind one zero, then reload from `0xD03C + count/2` (the divide) or `0xD045 - count/2` (the multiply) and shift four more bits when the count is odd.  The index that falls off the front reads a zeroed byte and the one that runs past the end reads the zero the staging put there, so the answer is `record[k + half]` / `record[k - half]` with zeros outside 1..9 - and the multiply also clears the record's top byte while the divide keeps it |
 | `sub` + `das` as a five test | `0x1CA30` subtracts five from the low half of `0xD001`, masks the byte again and repeats until the subtraction stops borrowing, then branches on 0, 2 or less.  `DAS` adjusts **both** nibbles (`0x0A` becomes `0x04`), so the answer is not `k % 5` for `k >= 10`: 0..4 loop once and come back as themselves, 5..14 give `k - 5`, 15 gives 4 |
+| a stacked argument that is a **pointer**, not a value | `0x09846` shares its rectangle fill with the constant-pattern pair `0x09826`/`0x09834`, but its stacked word is an address: the body reads `l r0, [er8]` **inside** the per-byte loop and steps er8 by one after each written column byte, so the fill consumes a byte stream rather than repeating a pattern.  A null pointer takes the stub at `0x09854` and draws nothing at all - not a clear, which is what `0x09826` is for.  Reading the stacked word as the pattern matches the pair that pass a constant value and diverges from the very first byte of a dotted fill (the firmware's own call from `0x09EE8` reads the ROM table at `0x646E`) | `0x09846` diff-test, swept over five geometries x two buffers x pointers into RAM, into ROM and null |
+| a routine that never returns | `0x09EE8` ends in `b _start` (`0x0A1CE`), so the harness cannot wait for a `rt`: `run_rom_until(addr, args, name, stop)` steps the core until pc/csr reach the stop address and copies the image *there*, which is what a body that hands control to the main loop has to be compared against.  Its callees also read stack slots they never wrote - the `2[sp]` fallback inside `0x09846` and the holes the frames leave - so a stack full of random bytes sends the ROM through a `pop pc` that was never pushed (the line reads `code fetch from unmapped segment` at an address that is really data): pin `0xEC00..0xEFFF` to zero, exactly as at boot, and keep the rest of the data space random.  A routine whose *own* exit is `pop pc` (the `0x09F68` tail) needs the opposite: `{NX8_SENTINEL, 0}` in the stacked words, because `pop pc` pops four bytes | `0x09EE8` (eight random data spaces, plus the `0xD0F5` guard through the plain runner) and `0x09F68` (`bc ne`/`bc eq` on `0xF042`, four filter bytes) |
 | the answer's high half | `0x08FEE` writes only r0, so `line_print`'s `count` comes back in r0 and whatever r1 held at the end in r1: one more than `char_print`'s row count (0x0E for the 14-pixel font, 0x0A for the 10-pixel one, one less for the wide markers 241/242), the arguments untouched when `char_print` was off screen (`x > 191`, or `y >= 64`), the buffer end 0xE3D3/0xE9D3 when the row loop ran off the bottom, and the caller's y when nothing was drawn at all.  The control character 1 inherits the half from its **own** `char_print`, which draws two pixels to the left - so at x = 0 or 1 it is off screen and r1 stays at y | `char_print`, `char_print_1byte`, `line_print` and `line_print.col_0` diff-tests, all four compared as full words since this row was written |
 
 Consequence worth stating once: a block copy must not read and write one byte at
@@ -157,7 +159,7 @@ written by hand:
 
 ## Where the remaining work is
 
-The call graph is the schedule. `tools/frontier.py` currently reports 115
+The call graph is the schedule. `tools/frontier.py` currently reports 113
 routines that are ready (every dependency already translated), and the count
 grows as routines land, so the work does not run out.  `-a` lists them by size;
 the cheapest tier is still ~60 routines of fourteen instructions or fewer.

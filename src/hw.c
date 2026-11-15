@@ -6,7 +6,10 @@
  */
 #include "hw.h"
 
+#include "display.h"
 #include "edit.h"
+#include "keyboard.h"
+#include "print.h"
 #include "runtime.h"
 
 /* 0x099FC - `mov r0, 1; st r0, [0xF810]; rt` */
@@ -697,4 +700,34 @@ uint16_t submode_needs_setup(uint8_t *ds, uint16_t arg)
     if ((uint8_t)(mode & 0x80u) == 0 || sub != 2u)
         return high;
     return (uint16_t)(high | 1u);
+}
+
+/* 0x09EE8 - the setup a mode switch runs before the next redraw.  Everything
+ * here is state, not arithmetic: clear the packed buffer, fill the title box
+ * from the ROM's dotted pattern at 0x646E (a *pointer*, one byte consumed per
+ * column byte), render, wait a while, drop the LCD mode and the timer flags,
+ * then jump into the main loop - `b _start` at 0x0A1CE, so the main path never
+ * comes back and only 0xD0F5 != 0 returns at all.
+ *
+ * The answer on that early exit is the 0xD0F5 byte with the caller's r1 on
+ * top; every caller in the firmware is entered with r1 = 0. */
+uint16_t screen_mode_setup(uint8_t *ds)
+{
+    if (ds[0xD0F5] != 0)
+        return ds[0xD0F5];
+
+    buffer_clear(ds);                                    /* 0x08C60 */
+    (void)fill_rect_stream(ds, 0x1625, 0x1680, 0x646Eu);  /* 0x09846 */
+    render_ddd4(ds);                                     /* 0x0947C */
+    (void)timer_delay(ds, 0x1000);                       /* 0x09F3A */
+
+    ds[0xF031] = 3;                                      /* screen.mode */
+    ds[0xF03D] = 0;
+    ds[0xF00A] = 0;
+    ds[0xF010] = 0;
+    ds[0xF011] = 0;
+    key_filter_clear(ds);                                /* 0x0A15A */
+    key_output_zero(ds);                                 /* 0x0A16A */
+    (void)timer_delay_tail(ds);                          /* 0x09F68 */
+    return 0;                                            /* never reached */
 }

@@ -119,6 +119,52 @@ uint16_t run_rom(uint32_t addr, const Args *a, const char *what)
     return run_rom_ex(addr, a, what, NULL);
 }
 
+/* Some routines end in `b _start` - a jump into the main loop - instead of
+ * returning, so the only way to diff-test them is to stop the machine on the
+ * instruction the jump lands on and compare what the body wrote before it.
+ * Same setup as run_rom_ex, then a step loop with a stop address. */
+int run_rom_until(uint32_t addr, const Args *a, const char *what,
+                  uint32_t stop)
+{
+    machine_reset();
+    memcpy(m.mem + RAM_BASE, image + RAM_BASE, IMG_SIZE - RAM_BASE);
+    if (a && a->sp)
+        m.sp = a->sp;
+    for (int i = 0; i < 8; i++)
+        nx8_set_er(&m, (unsigned)(i * 2), a ? a->er[i] : 0);
+    if (a)
+        for (int i = 0; i < a->nstk; i++) {
+            m.mem[m.sp + 2 * i] = (uint8_t)(a->stk[i] & 0xFF);
+            m.mem[m.sp + 2 * i + 1] = (uint8_t)(a->stk[i] >> 8);
+        }
+    m.lr = NX8_SENTINEL & 0xFFFF;
+    m.lcsr = 0;
+    m.csr = (uint16_t)((addr >> 16) & 0x000F);
+    m.pc = (uint16_t)addr;
+
+    size_t steps = 0;
+    while ((uint32_t)m.pc != (stop & 0xFFFF) ||
+           (uint32_t)m.csr != ((stop >> 16) & 0x000F)) {
+        nx8_step(&m);
+        if (m.faulted || ++steps > 8000000) {
+            if (m.faulted)
+                printf("FAIL %-24s ROM run did not reach %05X (fault=%d, %s,"
+                       " pc=%04X)\n", what, stop, m.faulted,
+                       m.fault_msg ? m.fault_msg : "-", m.pc);
+            else
+                printf("FAIL %-24s ROM run did not reach %05X (stuck at"
+                       " %04X)\n", what, stop, m.pc);
+            failures++;
+            memset(after_rom, 0, sizeof(after_rom));
+            return 0;
+        }
+    }
+    memcpy(after_rom, image, IMG_SIZE);
+    memcpy(after_rom + RAM_BASE, m.mem + RAM_BASE, IMG_SIZE - RAM_BASE);
+    memcpy(after_rom_regs, m.r, sizeof(after_rom_regs));
+    return 1;
+}
+
 void check_ret(const char *what, uint16_t rom_ret, uint16_t c_ret)
 {
     checks++;

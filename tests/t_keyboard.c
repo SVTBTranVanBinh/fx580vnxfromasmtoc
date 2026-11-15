@@ -29,6 +29,33 @@ static void test_timer_delay(void)
     }
 }
 
+/* 0x09F68 is the tail of 0x09F3A as an entry of its own: `delay.l_02E`, what
+ * 0x09EE8 calls when it hands control to the main loop.  With 0xF042 armed it
+ * stops after the two display-timer writes and answers that byte; otherwise it
+ * reprograms the timer and answers 0x0700, and the answer's high half is the
+ * caller's r1 - every caller is entered with r1 = 0. */
+static void test_timer_delay_tail(void)
+{
+    static const uint8_t filter[] = {0, 1, 0x42, 0xFF};
+
+    for (size_t f = 0; f < sizeof(filter) / sizeof(filter[0]); f++) {
+        for (unsigned fa = 0; fa < 2; fa++) {
+            random_image(0xA0100u + (unsigned)(f * 4 + fa));
+            image[0xF00A] &= (uint8_t)~0x02;
+            image[0xF00A] |= (uint8_t)(fa ? 2 : 0);
+            image[0xF042] = filter[f];
+            /* 0x09F68 ends in `pop pc`, which pops the four bytes the call
+             * pushed: give it the sentinel pair so the run can come back */
+            Args args = {.er = {0, 0}, .stk = {NX8_SENTINEL, 0}, .nstk = 2};
+            uint16_t rom_ret = run_rom(0x09F68, &args, "timer_delay_tail");
+            begin_c();
+            uint16_t c_ret = timer_delay_tail(after_c);
+            check_ret("timer_delay_tail", rom_ret, c_ret);
+            check_mem("timer_delay_tail", 0xF000, 0xF060);
+        }
+    }
+}
+
 static void test_timer_delay_once(void)
 {
     static const uint16_t args[] = {0, 1, 0x1234, 0xFF00, 0xFFFF};
@@ -376,6 +403,7 @@ void test_keyboard(void)
     test_blink_countup();
     test_blink_countdown();
     test_timer_delay();
+    test_timer_delay_tail();
     test_timer_delay_once();
     test_display_pulse();
     test_check_any_key();

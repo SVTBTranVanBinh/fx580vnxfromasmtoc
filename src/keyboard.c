@@ -56,6 +56,29 @@ uint16_t timer_delay(uint8_t *ds, uint16_t interval)
     return 0x0700;
 }
 
+/* 0x09F68 - the second half of 0x09F3A as an entry of its own (`delay.l_02E`):
+ * the timer is reloaded with the firmware's short interval.  With the key
+ * filter armed the routine stops right after the two display-timer writes and
+ * answers that byte; otherwise it reprograms everything and answers 0x0700,
+ * exactly like the full routine does once it has said its piece. */
+uint16_t timer_delay_tail(uint8_t *ds)
+{
+    ds[SFR_0F008] = 80;
+    ds[SFR_0F008] = 160;
+    ds[SFR_0F009] = 2;
+
+    if (ds[SFR_KEY_IN_FILTER] != 0)
+        return ds[SFR_KEY_IN_FILTER];
+
+    wr16(ds, SFR_TIMER_PRESCALE, 15);
+    wr16(ds, SFR_TIMER_COUNTER, 0);
+    wr16(ds, SFR_TIMER_INTERVAL, 0x079E);
+    ds[SFR_TIMER_CONTROL] = 1;
+    ds[SFR_0F014] = 0;
+    ds[SFR_0F015] = 0;
+    return 0x0700;
+}
+
 /* 0x29B58 - blink the panel once: switch the display on, wait 1600 timer ticks
  * (`mov r0, 64 / mov r1, 6` is er0 = 0x0640), switch it off again.  The two
  * toggles go through the label at 0x0A146 inside 0x0A128's body. */
