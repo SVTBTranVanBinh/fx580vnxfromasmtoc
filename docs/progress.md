@@ -52,8 +52,8 @@ on the same partition:
 
 | metric | current |
 | --- | --- |
-| routines | 238 / 761 (31.3%) |
-| instructions | 4772 / 32749 (14.6%) |
+| routines | 243 / 761 (31.9%) |
+| instructions | 4847 / 32749 (14.8%) |
 
 (Measured with `python3 tools/coverage.py`; the instruction total counts the
 ret/rt-delimited bodies the tooling treats as one routine each, not every word
@@ -72,7 +72,7 @@ the core manual (`resource/nX-U8100 Core Instruction Manual.txt`) or against
 
 | trap | rule | where the manual says so |
 | --- | --- | --- |
-| `BC GE` / `BC LT` | **unsigned** (`C=0` / `C=1`); the signed forms are `BC GES` / `BC LTS` | §3.3, `Bcond` condition table |
+| `BC GE` / `BC LT` / `BC GT` | **unsigned** - `GE` is `C=0`, `LT` is `C=1`, `GT` is `(C=0)&&(Z=0)`; the signed forms are only `BC GES` / `BC LTS`.  So `cmp r0, 0 ; bc gt` is "nonzero", not "positive", and 0x80..0xFF takes the branch (`0x2EB66`) | §3.3, `Bcond` condition table |
 | multi-byte `l`/`st` | the effective address is forced even: address bit 0 is ignored, so an odd pointer rounds *down* | §1.3.5.3 "Word Boundaries" |
 | register groups | `erN` = 2 bytes (`rN..rN+1`), `xrN` = 4 (`rN..rN+3`), `qrN` = 8 (`rN..rN+7`) - the number is the *first* register, so `push qr8` saves r8..r15 and `push xr0` saves **r0..r3** | `tools/nx8.py`, instruction formats |
 | `push xr0` / `pop xr0` as a save | restoring r0..r3 throws away the callee's `er0` answer. `0x17B16` (`mov er0,0` / `bl f_0AC60` / `mov er14,er0` / `pop xr0`) therefore answers *in er14 only* and returns the caller's er0 untouched | `0x17B16` diff-test, three wrong translations before the register image showed er14 right and er0 zero |
@@ -146,7 +146,7 @@ written by hand:
 
 ## Where the remaining work is
 
-The call graph is the schedule. `tools/frontier.py` currently reports 123
+The call graph is the schedule. `tools/frontier.py` currently reports 118
 routines that are ready (every dependency already translated), and the count
 grows as routines land, so the work does not run out.  `-a` lists them by size;
 the cheapest tier is still ~60 routines of fourteen instructions or fewer.
@@ -185,7 +185,7 @@ instruction percentage fastest, because those routines are big.
 ## A note on the 30% target
 
 30% of the instruction total is roughly 9800 instructions; at the
-current 14.6% the project is ~4800 instructions in. Reaching 30% therefore means
+current 14.8% the project is ~4800 instructions in. Reaching 30% therefore means
 translating on the order of 300 more routines, and the ones that are left are
 bigger and more entangled than the ones done so far (the easy leaf
 functions and hardware pokes are largely gone). Work in batches with

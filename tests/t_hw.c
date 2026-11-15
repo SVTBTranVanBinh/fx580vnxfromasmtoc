@@ -19,6 +19,7 @@ W0(mode136_screen_state)
 W0(cursor_rows_init)
 W0(row_limit_for_mode)
 W1(distance_from_0D010)
+W1(mode_code_from_flag)
 W1(mode12_screen_reset)
 W1(mode3_screen_reset)
 W1(mode136_row_clear)
@@ -207,6 +208,15 @@ static void test_state_predicates(void)
     }
 }
 
+/* 0x286A0 takes a byte and needs the caller's high half back untouched, so the
+ * adapter keeps the word and lets the C body slice it. */
+static uint16_t a_mode_state_update(uint8_t *ds, const uint16_t *e,
+                                    const uint16_t *stk)
+{
+    (void)stk;
+    return mode_state_update(ds, e[0]);
+}
+
 void test_hw(void)
 {
     test_state_predicates();
@@ -250,6 +260,8 @@ void test_hw(void)
         {"counter_sum_0D156", 0x2FA02, "", a_counter_sum_0D156, 0},
         {"record_10b_0DA40", 0x18940, "w", a_record_10b_0DA40, 0},
         {"state_reset_0D116", 0x09D42, "", a_state_reset_0D116, 0},
+        {"mode_code_from_flag", 0x2ACBE, "w", a_mode_code_from_flag, 0},
+        {"mode_state_update", 0x286A0, "wb", a_mode_state_update, 0},
         {"table_byte_10b", 0x1826E, "w", a_table_byte_10b, 0},
         {"state_swap_nibbles", 0x0E1D2, "", a_state_swap_nibbles, 0},
         {"state_merge_high", 0x2084C, "b", a_state_merge_high, 0},

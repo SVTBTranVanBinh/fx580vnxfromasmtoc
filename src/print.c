@@ -547,3 +547,38 @@ uint16_t fill_rect_clear(uint8_t *ds, uint16_t xy, uint16_t size)
 {
     return fill_rect_pattern(ds, xy, size, 0x0000u);
 }
+
+/* 0x20A38 - clear the caller's buffer and copy a fixed two-character constant
+ * behind it, unless the digit hiding behind the pointer decodes to 13.
+ *
+ * The store comes first, before the digit is read: when the buffer and the
+ * pointer overlap, the digit that is tested is the zero just written.  The
+ * answer is the digit decoder's word on the early exit (so its high half is the
+ * pointer's) and the destination on the copy path. */
+uint16_t digit_text_unless_13(uint8_t *ds, uint16_t ptr, uint16_t out)
+{
+    uint16_t digit;
+
+    ds_put(ds, out, 0);
+    digit = digit_at(ds, ptr);
+    if ((uint8_t)digit == 13u)
+        return digit;
+    return smart_strcpy_nn(ds, out, 0x1DB4u);
+}
+
+/* 0x26316 - walk the text stream at `p` and answer the address of the first
+ * character that decodes to `target`; 0 when the string ends first.
+ *
+ * `cmp er0, er10` is a full sixteen-bit compare, so a two-byte token matches
+ * its own code and not just its lead byte.  The end-of-string answer is
+ * `mov er0, 0` - the sixteen-bit move, not `mov r0, 0` - so it really is zero
+ * and not the pointer's top byte. */
+uint16_t find_char_in_stream(uint8_t *ds, uint16_t p, uint16_t target)
+{
+    while (ds[p] != 0) {
+        if (decode_char_code(ds, p) == target)
+            return p;
+        p = advance_char_pointer(ds, p);
+    }
+    return 0;
+}

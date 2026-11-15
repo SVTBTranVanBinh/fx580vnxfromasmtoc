@@ -569,3 +569,49 @@ uint16_t return_immediately_1FFFE(uint8_t *ds, uint16_t arg)
     (void)ds;
     return arg;
 }
+
+/* The shared tail of the reset routine above, entered at the label the ROM
+ * calls with `bl f_09D42.l_018` (0x09D5A): it zeroes 0xD119, 0xD118 and 0xD148
+ * but leaves 0xD116 and 0xD117 alone, and r0 comes back 0 with r1 untouched. */
+static void state_reset_0D119(uint8_t *ds)
+{
+    ds[0xD119] = 0;
+    ds[0xD118] = 0;
+    ds[0xD148] = 0;
+}
+
+/* 0x2ACBE - settle the screen state for a fresh mode: three state bytes are
+ * cleared, the flag at 0xD14F decides whether four "first time through" flags
+ * are armed too, and the code byte at 0xD114 becomes 18 when it is set and 9
+ * when it is not.  0xD115 and 0xD116 are then forced to 0 and 3.
+ *
+ * The answer is `mov r0, 3` over an r1 nothing in the body ever wrote, so the
+ * caller's high half survives. */
+uint16_t mode_code_from_flag(uint8_t *ds, uint16_t arg)
+{
+    state_reset_0D119(ds);
+
+    if (ds[0xD14F] != 0) {
+        (void)flags_set_four(ds);
+        ds[0xD114] = 18;
+    } else {
+        ds[0xD114] = 9;
+    }
+    ds[0xD115] = 0;
+    ds[0xD116] = 3;
+    return (uint16_t)((arg & 0xFF00u) | 3u);
+}
+
+/* 0x286A0 - record the mode byte and mark the state dirty unless the old and
+ * the new byte are both 0xC0 (the one transition that is already settled).
+ * The callee's r0 = 0 lands under the caller's untouched high half. */
+uint16_t mode_state_update(uint8_t *ds, uint16_t arg)
+{
+    uint8_t value = (uint8_t)arg;
+
+    if (!(ds[0xD114] == 0xC0u && value == 0xC0u))
+        ds[0xD115] = 1;
+    ds[0xD114] = value;
+    state_reset_0D119(ds);
+    return (uint16_t)(arg & 0xFF00u);
+}

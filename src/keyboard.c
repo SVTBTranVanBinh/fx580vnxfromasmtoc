@@ -273,3 +273,25 @@ uint8_t poll_on_key(uint8_t *ds)
     ds[SFR_KEY_OUTPUT] = 0;
     return 1;
 }
+
+/* 0x2EB66 - count the byte at offset 5 of the structure down and blink the
+ * panel once when it runs out.
+ *
+ * `cmp r0, 0 ; bc gt` is the *unsigned* greater-than (C=0 && Z=0), not the
+ * signed one - only GES/LTS are signed - so 0x80..0xFF counts down like any
+ * other value.  The `add r0, 255` is the decrement.  On the decrement path the
+ * answer is the new count below the caller's high half; on the blink path er0
+ * is zero because the delay the blink ends with has already zeroed r1. */
+uint16_t blink_countdown(uint8_t *ds, uint16_t ptr)
+{
+    uint8_t value = ds[(uint16_t)(ptr + 5)];
+
+    if (value != 0) {
+        uint8_t next = (uint8_t)(value - 1u);
+
+        ds_put(ds, (uint16_t)(ptr + 5), next);
+        return (uint16_t)((ptr & 0xFF00u) | next);
+    }
+    (void)display_pulse(ds, 0);
+    return 0;
+}

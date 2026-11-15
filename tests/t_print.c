@@ -585,8 +585,77 @@ static void test_advance_char_pointer(void)
     }
 }
 
+/* 0x20A38 - the buffer is cleared before the digit is read, so an overlapping
+ * source is read *after* the clear.  Sweep the pointer byte range with the
+ * buffer on top of the source, one past it and far away, and put every kind of
+ * digit byte behind the pointer: 0x00..0x0F decode to nothing and 0xF0 and up
+ * carry the low nibble, so 13 is reachable only through 0xFD. */
+static void test_digit_text_unless_13(void)
+{
+    static const int offs[] = {0, 1, 2, 0x100};
+    static const uint8_t kinds[] = {0x00, 0x0C, 0x0D, 0xF0, 0xFD, 0xFE, 0xFF};
+
+    for (size_t k = 0; k < sizeof(offs) / sizeof(offs[0]); k++) {
+        for (size_t j = 0; j < sizeof(kinds) / sizeof(kinds[0]); j++) {
+            for (unsigned low = 0; low < 256; low += 5) {
+                uint16_t ptr = (uint16_t)(0xD200 + low);
+                uint16_t out = (uint16_t)(ptr + offs[k]);
+
+                random_image(0x20A38u + (uint32_t)(k * 700u + j * 30u + low));
+                image[ptr] = kinds[j];
+                image[(uint16_t)(ptr + 1)] = (uint8_t)(0x30 + j);
+                image[out] = 0x5A;
+
+                Args a = {.er = {ptr, out}, .nstk = 0};
+                uint16_t r = run_rom(0x20A38, &a, "digit_text_unless_13");
+                begin_c();
+                uint16_t c = digit_text_unless_13(after_c, ptr, out);
+                check_ret("digit_text_unless_13", r, c);
+                check_mem_all("digit_text_unless_13");
+            }
+        }
+    }
+}
+
+/* 0x26316 - the match is a full sixteen-bit compare, so a two-byte token is
+ * found by its own code and not by its lead byte.  The stream mixes one-byte,
+ * two-byte and equal-adjacent tokens, which is where a wrong advance shows. */
+static void test_find_char_in_stream(void)
+{
+    static const uint8_t streams[][8] = {
+        {0x41, 0x42, 0x00},
+        {0xF0, 0x41, 0x42, 0x00},
+        {0xF1, 0x02, 0x00},
+        {0xF0, 0xF0, 0x41, 0x00},
+        {0x00},
+        {0xFF, 0xFF, 0xFF, 0x00},
+    };
+    static const uint16_t targets[] = {0x0000, 0x0041, 0x0042, 0xF041, 0xF102,
+                                       0xF0F0, 0xFFFF};
+    static const uint16_t bases[] = {0xD200, 0xD201, 0xE000};
+
+    for (size_t s = 0; s < sizeof(streams) / sizeof(streams[0]); s++) {
+        for (size_t t = 0; t < sizeof(targets) / sizeof(targets[0]); t++) {
+            for (size_t b = 0; b < sizeof(bases) / sizeof(bases[0]); b++) {
+                random_image(0x26316u + (uint32_t)(s * 100u + t * 7u + b));
+                for (size_t i = 0; i < 8; i++)
+                    image[(uint16_t)(bases[b] + i)] = streams[s][i];
+
+                Args a = {.er = {bases[b], targets[t]}, .nstk = 0};
+                uint16_t r = run_rom(0x26316, &a, "find_char_in_stream");
+                begin_c();
+                uint16_t c = find_char_in_stream(after_c, bases[b], targets[t]);
+                check_ret("find_char_in_stream", r, c);
+                check_mem_all("find_char_in_stream");
+            }
+        }
+    }
+}
+
 void test_print(void)
 {
+    test_digit_text_unless_13();
+    test_find_char_in_stream();
     test_font14_clear_screen();
     test_advance_char_pointer();
 

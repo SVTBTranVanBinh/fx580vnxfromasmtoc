@@ -159,6 +159,14 @@ uint16_t record_to_pointer(uint8_t *ds);
 uint16_t record_status_flag40_roundtrip(uint8_t *ds, uint16_t src, uint16_t spare);
 uint16_t record_status_digit_fixup(uint8_t *ds, uint16_t src, uint16_t spare);
 uint16_t record_pair_digit_merge(uint8_t *ds, uint16_t src_a, uint16_t src_b);
+/* print.c - 0x20A38, 0x26316 */
+uint16_t digit_text_unless_13(uint8_t *ds, uint16_t ptr, uint16_t out);
+uint16_t find_char_in_stream(uint8_t *ds, uint16_t p, uint16_t target);
+/* hw.c - 0x2ACBE, 0x286A0 */
+uint16_t mode_code_from_flag(uint8_t *ds, uint16_t arg);
+uint16_t mode_state_update(uint8_t *ds, uint16_t arg);
+/* keyboard.c - 0x2EB66 */
+uint16_t blink_countdown(uint8_t *ds, uint16_t ptr);
 uint16_t record10_er8_from_er4(uint8_t *ds, uint16_t src, uint16_t dst);
 uint16_t init_struct_30(uint8_t *ds, uint16_t frame);
 uint16_t record_kind_flag(uint8_t *ds, uint16_t arg);

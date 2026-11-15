@@ -288,8 +288,33 @@ static void test_hw_bringup(void)
     }
 }
 
+/* 0x2EB66 counts a byte down and blinks the panel when it is spent, so the
+ * count is swept over every byte value - `bc gt` is unsigned, so 0x80..0xFF take
+ * the decrement path.  The pointers cover the writable windows (RAM, the odd
+ * address the byte load does not round, and the framebuffer); a pointer below
+ * 0xD000 would address ROM, which the harness cannot preload with a chosen
+ * byte, so that case is not a test of this routine. */
+static void test_blink_countdown(void)
+{
+    static const uint16_t ptrs[] = {0xD200, 0xD201, 0xD2FE, 0xE000, 0xF800};
+
+    for (size_t p = 0; p < sizeof(ptrs) / sizeof(ptrs[0]); p++) {
+        for (unsigned value = 0; value < 256; value++) {
+            random_image((uint32_t)(0x2EB66u + p * 300u + value));
+            image[(uint16_t)(ptrs[p] + 5)] = (uint8_t)value;
+            Args a = {.er = {ptrs[p]}, .nstk = 0};
+            uint16_t r = run_rom(0x2EB66, &a, "blink_countdown");
+            begin_c();
+            uint16_t c = blink_countdown(after_c, ptrs[p]);
+            check_ret("blink_countdown", r, c);
+            check_mem_all("blink_countdown");
+        }
+    }
+}
+
 void test_keyboard(void)
 {
+    test_blink_countdown();
     test_timer_delay();
     test_timer_delay_once();
     test_display_pulse();
