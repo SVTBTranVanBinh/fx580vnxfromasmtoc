@@ -87,6 +87,14 @@ void key_scan_end(uint8_t *ds)
     ds[RAM_0D13A] = 0;
 }
 
+/* 0x0A16A - `mov r2, 0 ; st r2, [keyboard.ko] ; rt`: the driven column goes
+ * back to zero.  This is *not* 0x09FF6 - that one clears 0xD13A and leaves 0xF046
+ * alone - which is what 0x0D38E's sweep caught. */
+void key_output_clear(uint8_t *ds)
+{
+    ds[SFR_KEY_OUTPUT] = 0;
+}
+
 uint8_t check_any_key_pressed(uint8_t *ds, uint16_t desc)
 {
     uint8_t found = 0;
@@ -331,4 +339,41 @@ uint16_t blink_countup(uint8_t *ds, uint16_t ptr)
     pulsed = display_pulse(ds, 0);
     ds_put(ds, (uint16_t)(ptr + 5), limit);
     return (uint16_t)((pulsed & 0xFF00u) | limit);
+}
+
+/* 0x0D38E - debounce a key: drive the descriptor's output byte, read the rows
+ * back four times with a ten-tick wait between samples, and keep the bits that
+ * were clear every time.  The descriptor's byte is narrowed in place to the bits
+ * that were pressed on every sample, and the answer is 1 only when all four
+ * samples agreed.
+ *
+ * Two high-half details: `mov r0, r7` writes only r0, so the high byte is still
+ * the descriptor byte the loop's last `l r1, [er8]` loaded; and `cmp r6, 5 ;
+ * bc le` is unsigned, which is what stops the loop after four passes. */
+uint16_t key_debounce(uint8_t *ds, uint16_t desc)
+{
+    uint8_t stable = 1;
+    uint8_t hits = 0;
+    uint8_t pass = 1;
+    uint8_t mask = 0;
+
+    do {
+        uint8_t rows;
+
+        (void)timer_delay(ds, 10);
+        ds[SFR_KEY_OUTPUT] = ds[(uint16_t)(desc + 1)];
+        rows = (uint8_t)(ds[SFR_KEY_INPUT] ^ 0xFFu);
+        key_output_clear(ds);
+        mask = ds[desc];
+        if ((uint8_t)(rows & mask) != 0) {
+            hits++;
+            mask = (uint8_t)(mask & rows);
+            ds_put(ds, desc, mask);
+        }
+        pass++;
+    } while (pass <= 5);
+
+    if (hits != 5)
+        stable = 0;
+    return (uint16_t)(((uint16_t)mask << 8) | stable);
 }

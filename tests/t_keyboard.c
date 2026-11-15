@@ -2,6 +2,7 @@
 #include "harness.h"
 
 #include "../src/keyboard.h"
+#include "../src/runtime.h"
 
 static void test_timer_delay(void)
 {
@@ -340,8 +341,38 @@ static void test_blink_countup(void)
     }
 }
 
+/* 0x0D38E samples the key matrix four times and keeps the bits that stayed
+ * clear.  The interesting states are: every sample agrees (answer 1), only some
+ * samples agree (answer 0 with the byte narrowed anyway), and a descriptor byte
+ * that is already 0.  The row input is driven from the image, so the four
+ * samples see whatever 0xF040 holds - constant, which is what the ROM reads. */
+static void test_key_debounce(void)
+{
+    static const uint8_t descs[][2] = {
+        {0x00, 0x00}, {0xFF, 0x00}, {0x0F, 0x00}, {0xAA, 0xFF}, {0x01, 0x01},
+    };
+    static const uint8_t rows[] = {0x00, 0xFF, 0x0F, 0xF0, 0xAA, 0x55};
+
+    for (size_t d = 0; d < sizeof(descs) / sizeof(descs[0]); d++) {
+        for (size_t r = 0; r < sizeof(rows) / sizeof(rows[0]); r++) {
+            random_image(0x0D38Eu + (uint32_t)(d * 11u + r));
+            image[0xD300] = descs[d][0];
+            image[0xD301] = descs[d][1];
+            image[SFR_KEY_INPUT] = rows[r];
+
+            Args a = {.er = {0xD300}, .nstk = 0};
+            uint16_t rom = run_rom(0x0D38E, &a, "key_debounce");
+            begin_c();
+            uint16_t c = key_debounce(after_c, 0xD300);
+            check_ret("key_debounce", rom, c);
+            check_mem_all("key_debounce");
+        }
+    }
+}
+
 void test_keyboard(void)
 {
+    test_key_debounce();
     test_blink_countup();
     test_blink_countdown();
     test_timer_delay();

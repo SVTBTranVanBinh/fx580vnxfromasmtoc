@@ -43,6 +43,9 @@ uint16_t display_pulse(uint8_t *ds, uint16_t arg);
 /* 0x09FF6 - end of a key scan: arms the next one. */
 void key_scan_end(uint8_t *ds);
 
+/* 0x0A16A - drive no column. */
+void key_output_clear(uint8_t *ds);
+
 /* 0x0E826 - is any key of one column pressed?  `desc` points at a two-byte
  * descriptor in the data space: [0] = the row mask, [1] = the column byte
  * to drive.  Returns 1 when a key is pressed (debounced), 0 otherwise. */

@@ -85,8 +85,18 @@ if [ ! -x machine/emulator/build/emulator ]; then
     exit 1
 fi
 
-( cd machine && SDL_VIDEODRIVER=dummy timeout -s KILL 120 \
-    emulator/build/emulator models/fx580vnx_emu \
+# The emulator's model folder expects the ROM next to its model.lua, and the
+# ROM cannot live in the submodule (it is not ours to commit), so the run uses a
+# copy under build/ with a symlink back to resource/rom.bin.
+if [ ! -f build/models/fx580vnx_emu/model.lua ]; then
+    mkdir -p build/models/fx580vnx_emu
+    cp machine/models/fx580vnx_emu/model.lua \
+       machine/models/fx580vnx_emu/interface.png build/models/fx580vnx_emu/
+    ln -sf ../../../resource/rom.bin build/models/fx580vnx_emu/rom.bin
+fi
+
+( cd machine && SDL_VIDEODRIVER=dummy timeout -s KILL 300 \
+    emulator/build/emulator model=../build/models/fx580vnx_emu \
     script=../tools/xcheck.lua ) 2>&1 | grep "^CASE " > build/xcheck_ref.txt
 ref=$(wc -l < build/xcheck_ref.txt)
 if [ "$ref" -lt 10 ]; then

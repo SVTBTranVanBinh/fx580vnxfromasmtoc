@@ -266,8 +266,33 @@ static void test_flag_or_empty_0D180(void)
     }
 }
 
+/* 0x2F710 - the three accepts are a window 65..73, the single code 64 and the
+ * single code 75; the sweep walks the whole byte plus a spread of high bytes so
+ * the sixteen-bit compares are tested against a non-zero upper half too. */
+static void test_code_is_64_to_73_or_75(void)
+{
+    static const uint16_t highs[] = {0x0000, 0x0100, 0x4100, 0xFF00};
+    static const uint8_t lows[] = {0x00, 0x3F, 0x40, 0x41, 0x42, 0x49, 0x4A,
+                                   0x4B, 0x4C, 0x4D, 0x80, 0xFF};
+
+    for (size_t h = 0; h < sizeof(highs) / sizeof(highs[0]); h++) {
+        for (size_t l = 0; l < sizeof(lows) / sizeof(lows[0]); l++) {
+            uint16_t arg = (uint16_t)(highs[h] | lows[l]);
+
+            random_image(0x2F710u + (uint32_t)(h * 29u + l));
+            Args a = {.er = {arg}, .nstk = 0};
+            uint16_t r = run_rom(0x2F710, &a, "code_is_64_to_73_or_75");
+            begin_c();
+            uint16_t c = code_is_64_to_73_or_75(after_c, arg);
+            check_ret("code_is_64_to_73_or_75", r, c);
+            check_mem_all("code_is_64_to_73_or_75");
+        }
+    }
+}
+
 void test_hw(void)
 {
+    test_code_is_64_to_73_or_75();
     test_value_is_two_or_four();
     test_flag_or_empty_0D180();
     test_state_predicates();

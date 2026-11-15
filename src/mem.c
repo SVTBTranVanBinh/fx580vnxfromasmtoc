@@ -6,6 +6,7 @@
  * which for every non-zero 16-bit count takes the branch, i.e. the count is
  * effectively unsigned.
  */
+#include "hw.h"
 #include "runtime.h"
 
 /* The data space is a flat 64 KiB window but only 0xD000-0xEFFF latches a

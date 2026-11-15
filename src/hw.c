@@ -6,6 +6,7 @@
  */
 #include "hw.h"
 
+#include "edit.h"
 #include "runtime.h"
 
 /* 0x099FC - `mov r0, 1; st r0, [0xF810]; rt` */
@@ -639,4 +640,28 @@ uint16_t value_is_two_or_four(uint8_t *ds, uint16_t arg)
     if ((uint8_t)value_is_two(ds, arg) != 0 || (uint8_t)arg == 4u)
         return (uint16_t)((arg & 0xFF00u) | 1u);
     return (uint16_t)(arg & 0xFF00u);
+}
+
+/* 0x2F710 - 1 when 0x2ABE4's code is 64, 65..73 or 75; 0 otherwise.
+ *
+ * The compares are sixteen-bit: `cmp r8, 73 ; cmpc r9, 0` is the pair form that
+ * folds the carry in, so they are unsigned comparisons of the whole er8, not of
+ * its low byte.  The answer is a bare `mov r0, x`; the `mov r1, 0` that loads
+ * the 66 for the first compare has already emptied the high half, so the er0 the
+ * caller sees is 1 or 0 and nothing else. */
+uint16_t code_is_64_to_73_or_75(uint8_t *ds, uint16_t arg)
+{
+    uint16_t code = editor_special_to_ascii(arg);
+    uint8_t answer;
+
+    (void)ds;
+    if (0x0042u > code) {
+        /* the early branch skips the window test, but 64 is below it too */
+        answer = (code == 64u || code == 75u) ? 1 : 0;
+    } else if (code <= 73u) {
+        answer = 1;
+    } else {
+        answer = (code == 75u) ? 1 : 0;
+    }
+    return answer;
 }

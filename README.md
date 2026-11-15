@@ -75,9 +75,21 @@ The cross-check is the only check that validates `emu/nx8.c` itself, and
 `emu/nx8.c` is the oracle every differential test compares against.  Skipping it
 silently would make "0 failures" mean "this project agrees with itself", so a
 missing reference emulator now **fails** the run; `--no-xcheck` skips it only
-when asked, and says so in what it prints.  (`machine/` is a submodule gitlink
-with no `.gitmodules` mapping at the moment, so `git submodule update --init
-machine` cannot find a URL until that is restored.)
+when asked, and says so in what it prints.
+
+`machine/` is a submodule pinned at CasioEmu commit `52938b7`, the HEAD of
+<https://github.com/user202729/CasioEmu> (the maintained fork of
+LBPHacker's original).  To get the cross-check running:
+
+```sh
+git submodule update --init machine
+cd machine/emulator && meson setup build && ninja -C build && cd ../..
+```
+
+That needs `meson`, `ninja`, Lua 5.3 and SDL2/SDL2_image.  The model folder the
+emulator loads is built on the fly under `build/models/fx580vnx_emu`: it is a
+copy of `machine/models/fx580vnx_emu` with `rom.bin` symlinked to
+`resource/rom.bin`, because a ROM must not be committed into the submodule.
 
 ### Adding a routine
 
