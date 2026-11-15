@@ -171,6 +171,7 @@ uint16_t blink_countup(uint8_t *ds, uint16_t ptr);
 /* extra leaves */
 uint16_t key_debounce(uint8_t *ds, uint16_t desc);
 uint16_t code_is_64_to_73_or_75(uint8_t *ds, uint16_t arg);
+uint16_t submode_needs_setup(uint8_t *ds, uint16_t arg);
 uint16_t flag_or_empty_0D180(uint8_t *ds);
 uint16_t value_is_two_or_four(uint8_t *ds, uint16_t arg);
 /* arith.c - 0x180B0 */

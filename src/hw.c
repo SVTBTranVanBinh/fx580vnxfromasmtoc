@@ -665,3 +665,36 @@ uint16_t code_is_64_to_73_or_75(uint8_t *ds, uint16_t arg)
     }
     return answer;
 }
+
+/* 0x20CF2 - does the current mode/submode pair need the screen set up?
+ *
+ * Mode 9 hands the decision to the per-submode table byte: the answer is 1
+ * unless that byte is 9.  Mode 6 accepts submodes 1..3 (both compares are
+ * unsigned), and every other mode accepts only when bit 7 of the mode byte is
+ * set and the submode is exactly 2.
+ *
+ * The high half of the answer comes from wherever r1 was left: the table byte's
+ * routine zeroes r1 before its load, while the other two paths never write r1
+ * at all, so the caller's byte comes back there. */
+uint16_t submode_needs_setup(uint8_t *ds, uint16_t arg)
+{
+    uint8_t mode = ds[0xD114];
+    uint8_t sub = ds[0xD115];
+    uint16_t high = (uint16_t)(arg & 0xFF00u);
+
+    if (mode == 9u) {
+        uint16_t attr = var_mode_attr(ds);
+
+        if ((uint8_t)attr == 9u)
+            return (uint16_t)(attr & 0xFF00u);
+        return (uint16_t)((attr & 0xFF00u) | 1u);
+    }
+    if (mode == 6u) {
+        if (sub < 1u || sub > 3u)
+            return high;
+        return (uint16_t)(high | 1u);
+    }
+    if ((uint8_t)(mode & 0x80u) == 0 || sub != 2u)
+        return high;
+    return (uint16_t)(high | 1u);
+}

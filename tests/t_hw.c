@@ -290,8 +290,50 @@ static void test_code_is_64_to_73_or_75(void)
     }
 }
 
+/* 0x20CF2 - mode 9 delegates to the per-submode table byte, mode 6 accepts
+ * submodes 1..3 and everything else needs bit 7 plus submode 2.  The sweep
+ * covers every mode byte, the interesting submodes, and the argument's high
+ * half, since two of the three paths pass it straight through. */
+static void test_submode_needs_setup(void)
+{
+    static const uint8_t modes[] = {0, 1, 6, 7, 9, 10, 0x80, 0x86, 0x89, 0xFF};
+    static const uint8_t subs[] = {0, 1, 2, 3, 4, 9, 0xFF};
+    static const uint8_t attrs[] = {0xD112};
+    static const uint8_t rows[] = {1, 3, 4, 5, 8};
+    static const uint8_t skews[] = {0, 0xFF};
+    static const uint16_t highs[] = {0x0000, 0x0100, 0xD700};
+
+    for (size_t m = 0; m < sizeof(modes) / sizeof(modes[0]); m++) {
+        for (size_t s = 0; s < sizeof(subs) / sizeof(subs[0]); s++) {
+            for (size_t r = 0; r < sizeof(rows) / sizeof(rows[0]); r++) {
+                for (size_t k = 0; k < sizeof(skews) / sizeof(skews[0]); k++) {
+                    for (size_t h = 0; h < sizeof(highs) / sizeof(highs[0]);
+                         h++) {
+                        uint32_t seed = 0x20CF2u + (uint32_t)(m * 977 + s * 53 +
+                                                              r * 7 + k * 3 + h);
+
+                        random_image(seed);
+                        image[0xD114] = modes[m];
+                        image[0xD115] = subs[s];
+                        image[attrs[0]] = rows[r];
+                        image[0xD14F] = skews[k];
+                        Args a = {.er = {highs[h]}, .nstk = 0};
+                        uint16_t rom = run_rom(0x20CF2, &a,
+                                              "submode_needs_setup");
+                        begin_c();
+                        uint16_t c = submode_needs_setup(after_c, highs[h]);
+                        check_ret("submode_needs_setup", rom, c);
+                        check_mem_all("submode_needs_setup");
+                    }
+                }
+            }
+        }
+    }
+}
+
 void test_hw(void)
 {
+    test_submode_needs_setup();
     test_code_is_64_to_73_or_75();
     test_value_is_two_or_four();
     test_flag_or_empty_0D180();

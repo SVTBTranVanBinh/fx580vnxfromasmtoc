@@ -52,8 +52,8 @@ on the same partition:
 
 | metric | current |
 | --- | --- |
-| routines | 250 / 761 (32.9%) |
-| instructions | 4974 / 32749 (15.2%) |
+| routines | 251 / 761 (33.0%) |
+| instructions | 5004 / 32749 (15.3%) |
 
 (Measured with `python3 tools/coverage.py`; the instruction total counts the
 ret/rt-delimited bodies the tooling treats as one routine each, not every word
@@ -146,7 +146,7 @@ written by hand:
 
 ## Where the remaining work is
 
-The call graph is the schedule. `tools/frontier.py` currently reports 112
+The call graph is the schedule. `tools/frontier.py` currently reports 111
 routines that are ready (every dependency already translated), and the count
 grows as routines land, so the work does not run out.  `-a` lists them by size;
 the cheapest tier is still ~60 routines of fourteen instructions or fewer.
