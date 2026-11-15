@@ -609,6 +609,184 @@ uint16_t record_reset_flag38(uint8_t *ds)
     return 0;
 }
 
+/* One byte of the `add rX, rY ; daa rX` (or `sub`/`das`) pair, exactly as the
+ * chip does it.  The decimal adjust reads the carry and half-carry of the
+ * arithmetic that came before it and then *keeps* that carry, which is what
+ * makes the second byte of a word borrow from the first - and the adjust
+ * itself can subtract 0x66, so a non-BCD input comes out mangled, not clamped.
+ * `emu/nx8.c:op_daa`/`op_das` are the reference. */
+static uint8_t bcd_step(uint8_t a, uint8_t b, uint8_t carry_in, int subtract,
+                        uint8_t *carry_out, uint8_t *zero_out)
+{
+    uint16_t operand = subtract ? (uint16_t)(uint8_t)~b : (uint16_t)b;
+    uint16_t sum = (uint16_t)((uint16_t)a + operand + carry_in);
+    uint8_t value = (uint8_t)sum;
+    uint8_t carry = (uint8_t)((sum >> 8) & 1u);
+    uint8_t half = (uint8_t)(((uint16_t)(a & 0x0Fu) + (operand & 0x0Fu) +
+                              carry_in) >> 4);
+    uint8_t adjust = 0;
+
+    if ((value & 0x0Fu) > 0x09 || half)
+        adjust |= 0x06;
+    if ((value & 0xF0u) > 0x90 || carry)
+        adjust |= 0x60;
+    *carry_out = carry;
+    if (subtract) {
+        value = (uint8_t)(value - adjust);
+        *zero_out = (uint8_t)(value == 0);
+    } else {
+        value = (uint8_t)(value + adjust);
+        *zero_out = (uint8_t)(value == 0);
+    }
+    return value;
+}
+
+/* 0x1C952 - normalise the accumulator record.
+ *
+ * The mantissa is a ten-byte value whose most significant digits sit at the
+ * *top* of 0xD000..0xD009, and the caller keeps a second copy of it in r1..r9.
+ * Leading zero nibbles are counted backwards from 0xD009; the count becomes the
+ * exponent byte 0xD00B and the mantissa is then slid up by half that many bytes
+ * (a whole byte per two nibbles, with a four-bit shift for the odd one).  A
+ * record whose top byte is 0x10 or more skips all of that: it is shifted right
+ * four bits and the exponent word at 0xD000 is incremented in BCD instead.
+ *
+ * The tail is a rounding pass over the low nibble of 0xD001, and every path
+ * ends by writing the three stack-saved chunks back: 0xD03C..0xD03F is restored
+ * from its own entry value, so any body that scribbled there is undone, while
+ * 0xD044..0xD047 and 0xD04C..0xD04D receive the entry contents of 0xD040 and
+ * 0xD044 - the record is copied down the buffer, not restored in place.
+ *
+ * r8/r9 is a 208-based pointer through most of the body, so `ds[0xD009] >= 240`
+ * (a digit byte that is really a flag) is the "nothing to do" early exit and
+ * answers the flag with the caller's r1 for a high half.
+ */
+uint16_t record10_normalise(uint8_t *ds, uint8_t *r)
+{
+    uint8_t count, remaining, byte, carry, zero, value, exponent;
+    uint8_t ret_lo, ret_hi, address_lo;
+    int i;
+
+    /* 0x1C95E pushes 0xD03C..0xD04F in three chunks and 0x1CA50 pops all
+     * twenty bytes back, so that window looks untouched from outside; only
+     * what the count path does with it is observable. */
+    ret_lo = ds[0xD03C];
+    ret_hi = ds[0xD03D];
+
+    if (ds[0xD009] >= 240) {
+        r[0] = ds[0xD009];
+        return (uint16_t)(((uint16_t)r[1] << 8) | r[0]);
+    }
+
+    for (i = 0; i < 8; i++)
+        r[i] = ds[(uint16_t)(0xD002 + i)];
+
+    if (r[7] >= 16) {
+        /* the top byte already holds a whole digit: shift four bits down and
+         * carry one into the exponent word */
+        shift_qr0_right4(ds, r);
+        value = bcd_step(ds[0xD000], 1, 0, 0, &carry, &zero);
+        ds_store(ds, 0xD000, value);
+        value = bcd_step(ds[0xD001], 0, carry, 0, &carry, &zero);
+        ds_store(ds, 0xD001, value);
+        for (i = 0; i < 8; i++)
+            ds_store(ds, (uint16_t)(0xD002 + i), r[i]);
+        goto tail;
+    }
+
+    /* count the empty half-nibbles from 0xD009 downwards.  A zero byte costs
+     * three counts on the first pass and the loop then re-reads the same
+     * address, which is where the extra one comes from. */
+    count = 0;
+    remaining = 7;
+    address_lo = 0x09;
+    for (;;) {
+        byte = ds[(uint16_t)(0xD000 + address_lo)];
+        if (byte != 0)
+            break;
+        count++;
+        address_lo--;
+        byte = ds[(uint16_t)(0xD000 + address_lo)];
+        if (byte >= 15)
+            break;
+        count++;
+        if (byte != 0)
+            break;
+        count++;
+        if (--remaining == 0)
+            goto zero_all;
+    }
+
+    ds_store(ds, 0xD00B, count);
+    if (count == 0)
+        goto tail;
+
+    /* the mantissa slides up half the count and 0xD03C..0xD043 has been
+     * zeroed, so a window that dips below 0xD044 reads zeros there */
+    for (i = 0; i < 8; i++) {
+        uint16_t a = (uint16_t)(0xD044u + (uint16_t)i -
+                                (uint16_t)(count >> 1));
+
+        r[i] = (a < 0xD044) ? 0 : ds[(uint16_t)(0xD002u + (a - 0xD044u))];
+    }
+    if (count & 1)
+        shift_qr0_left4(ds, r);
+    for (i = 0; i < 8; i++)
+        ds_store(ds, (uint16_t)(0xD002 + i), r[i]);
+
+    /* the exponent word loses the count, six more from ten on so the byte
+     * stays a decimal numeral */
+    exponent = count;
+    if (count >= 10)
+        exponent = (uint8_t)(count + 6);
+    value = bcd_step(ds[0xD000], exponent, 0, 1, &carry, &zero);
+    ds_store(ds, 0xD000, value);
+    value = bcd_step(ds[0xD001], 0, carry, 1, &carry, &zero);
+    ds_store(ds, 0xD001, value);
+
+tail:
+    /* 0x1CA30 keeps subtracting five from the low half of 0xD001, masking the
+     * byte every time round, until a subtraction no longer borrows */
+    value = (uint8_t)(ds[0xD001] & 0x0Fu);
+    for (;;) {
+        uint16_t x = (uint16_t)(value - 5);
+        uint8_t adjust = 0;
+
+        if (((x & 0x0Fu) > 9) || ((value & 0x0Fu) < 5))
+            adjust = 0x06;
+        if (((x & 0xF0u) > 0x90) || (value < 5))
+            adjust = (uint8_t)(adjust | 0x60);
+        value = (uint8_t)(x - adjust);
+        if (!(value & 0x80))
+            break;
+        value = (uint8_t)(value & 0x0Fu);
+    }
+    if (value == 0) {
+        /* exactly five taken off: the answer empties unless the exponent
+         * still has a digit above zero */
+        if (ds[0xD000] != 0)
+            goto out;
+        goto zero_all;
+    }
+    if (value == 2) {
+        record_reset_flag38(ds);
+        goto out;
+    }
+    if (value < 2)
+        goto out;
+
+zero_all:
+    for (i = 0; i < 10; i++)
+        ds_store(ds, (uint16_t)(0xD000 + i), 0);
+
+out:
+    /* the last pop of the three lands the entry 0xD03C..0xD043 back in the
+     * register file, which is also what the answer's two halves are */
+    for (i = 0; i < 8; i++)
+        r[i] = ds[(uint16_t)(0xD03C + i)];
+    return (uint16_t)(((uint16_t)ret_hi << 8) | ret_lo);
+}
+
 /* The two record handovers below are not straight copies: they convert between
  * the numeric record at 0xD000 and the display buffer, and the conversion is a
  * byte-order change.  Reading the record as five big-endian words, words 1..4

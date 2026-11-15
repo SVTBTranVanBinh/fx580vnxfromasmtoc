@@ -719,6 +719,56 @@ static void test_record_reset_flag38(void)
     }
 }
 
+/* 0x1C952 normalises the accumulator record, and it reads the mantissa out of
+ * the *register file* at entry (r4..r7 survive its own loads of r0..r3, and r7
+ * decides between the two halves of the routine), so the shape language cannot
+ * describe it.  The record is biased towards leading zero nibbles so the shift
+ * path is reached, and towards a 0x1x top byte so the shift-right path is too.
+ */
+static void one_normalise(uint32_t seed, const uint8_t *record, uint8_t bias)
+{
+    uint8_t regs[16], mine[16];
+    Args a = {.nstk = 0};
+
+    random_image(seed);
+    for (int i = 0; i < 10; i++)
+        image[0xD000 + i] = record[i];
+    for (int i = 0; i < 16; i++) {
+        regs[i] = (uint8_t)(image[0xD010 + i] ^ (uint8_t)(bias * 13u + i));
+        mine[i] = regs[i];
+        a.er[i / 2] = (uint16_t)(a.er[i / 2] |
+                                 ((uint16_t)regs[i] << ((i % 2) * 8)));
+    }
+
+    uint16_t rom_ret = run_rom(0x1C952, &a, "record10_normalise");
+    begin_c();
+    uint16_t c_ret = record10_normalise(after_c, mine);
+    check_ret("record10_normalise", rom_ret, c_ret);
+    check_mem("record10_normalise", 0xD000, 0xD04E);
+    check_mem_all("record10_normalise");
+    check_regs("record10_normalise", mine, 0x000Fu);
+}
+
+static void test_record10_normalise(void)
+{
+    static const uint8_t zero_top[10] = {0x12, 0x34, 0, 0, 0, 0, 0, 0, 0, 0};
+    static const uint8_t one_digit[10] = {0x00, 0x01, 0, 0, 0, 0, 0, 0, 0, 0x05};
+    static const uint8_t high_top[10] = {0x99, 0x99, 0x11, 0x22, 0x33, 0x44,
+                                         0x55, 0x66, 0x77, 0x88};
+    static const uint8_t flag_top[10] = {0x11, 0x22, 0x33, 0x44, 0x55, 0x66,
+                                         0x77, 0x88, 0x99, 0xF3};
+    static const uint8_t f_pairs[10] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+                                        0xFF, 0xFF, 0xFF, 0xFF};
+    static const uint8_t one_nibble[10] = {0x01, 0x00, 0, 0, 0, 0, 0, 0, 0, 0x21};
+    const uint8_t *records[] = {zero_top, one_digit, high_top, flag_top,
+                                f_pairs, one_nibble};
+
+    for (size_t r = 0; r < sizeof(records) / sizeof(records[0]); r++)
+        for (int bias = 0; bias < 16; bias++)
+            one_normalise(0xE1000u + (uint32_t)(r * 32 + bias), records[r],
+                          (uint8_t)bias);
+}
+
 /* 0x1C63E loads 0xD010 from the second argument before 0xD000 from the first,
  * so a source that overlaps the records sees the first half's writes. */
 static void test_records_from_pointers(void)
@@ -1006,6 +1056,7 @@ void test_mem(void)
     test_high_nibble_into_r5();
     test_record10_copy_if_present();
     test_record_reset_flag38();
+    test_record10_normalise();
     test_records_from_pointers();
     test_record_to_pointer();
     test_record10_er8_from_er4();

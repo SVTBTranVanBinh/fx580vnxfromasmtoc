@@ -154,6 +154,7 @@ uint16_t high_nibble_into_r5(uint8_t *ds, uint16_t arg, uint8_t r4,
 
 /* mem.c - the 0xD000/0xD010 record handover */
 uint16_t record_reset_flag38(uint8_t *ds);
+uint16_t record10_normalise(uint8_t *ds, uint8_t *r);
 uint16_t records_from_pointers(uint8_t *ds, uint16_t src_a, uint16_t src_b);
 uint16_t record_to_pointer(uint8_t *ds);
 uint16_t record_status_flag40_roundtrip(uint8_t *ds, uint16_t src, uint16_t spare);
