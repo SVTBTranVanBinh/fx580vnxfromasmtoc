@@ -53,7 +53,7 @@ def main():
     ready = []
     blocked = []
     for entry, (count, _callees) in bodies.items():
-        if entry in done:
+        if entry in done or entry in romdb.TRAMPOLINE_ENTRIES:
             continue
         pending = pending_of(entry)
         if pending:
@@ -81,7 +81,11 @@ def main():
         return
 
     ready.sort(key=lambda r: (-r[2], -r[0]))
+    skipped = len(romdb.TRAMPOLINE_ENTRIES & set(bodies) - done)
     print("%d routines are ready to translate" % len(ready))
+    if skipped:
+        print("  (%d not listed: transfers control with `pop pc` and never"
+              " returns - see romdb.TRAMPOLINE_ENTRIES)" % skipped)
     for count, entry, ndep, name in ready[:args.n]:
         print("  %05X  %4d insns  %2d deps  %s" % (entry, count, ndep, name))
 

@@ -156,6 +156,9 @@ uint16_t high_nibble_into_r5(uint8_t *ds, uint16_t arg, uint8_t r4,
 uint16_t record_reset_flag38(uint8_t *ds);
 uint16_t records_from_pointers(uint8_t *ds, uint16_t src_a, uint16_t src_b);
 uint16_t record_to_pointer(uint8_t *ds);
+uint16_t record_status_flag40_roundtrip(uint8_t *ds, uint16_t src, uint16_t spare);
+uint16_t record_status_digit_fixup(uint8_t *ds, uint16_t src, uint16_t spare);
+uint16_t record_pair_digit_merge(uint8_t *ds, uint16_t src_a, uint16_t src_b);
 uint16_t record10_er8_from_er4(uint8_t *ds, uint16_t src, uint16_t dst);
 uint16_t init_struct_30(uint8_t *ds, uint16_t frame);
 uint16_t record_kind_flag(uint8_t *ds, uint16_t arg);

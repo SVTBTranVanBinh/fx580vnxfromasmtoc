@@ -49,6 +49,22 @@ STRUCTURAL_ENTRIES = frozenset({0x0AC30, 0x0AC38, 0x2110A})
 NOT_A_FUNCTION = frozenset({0x00004, 0x0A1BC, 0x0A1CE, 0x0A1D0, 0x0AC30, 0x0AC38,
                             0x2110A})
 
+# Entries that are real functions but *never return to their caller*, so the
+# differential harness cannot run them: it starts the routine and waits for the
+# sentinel return address to come back.  They are left in the coverage
+# denominator (they are reachable code, unlike NOT_A_FUNCTION) but frontier.py
+# keeps them out of the "ready" list, because "ready to translate" would mean
+# "ready to diff-test" and that is never going to be true.
+#
+# 0x2FFC6 is the one found so far.  It pushes 18[er14] and 16[er14] and then
+# calls 0x1FFFE, whose body is a bare `pop pc`: `bl` only sets the link
+# registers on this core (it pushes nothing), and `pop pc` pops *four* bytes -
+# pc and csr - so the pair just pushed becomes the new pc/csr and control goes
+# to the address the caller stacked.  It is a computed transfer, not a call: run
+# it under the harness and it jumps into the argument and never comes back
+# (traced: pc = 0x3333, csr = 3, then a code fetch outside the ROM).
+TRAMPOLINE_ENTRIES = frozenset({0x2FFC6})
+
 
 def load_db(root=ROOT):
     with open(os.path.join(root, "build", "disas.json")) as f:

@@ -47,9 +47,13 @@ Three things keep the comparison honest:
   reported, never silently skipped, and is not compared against a shredded
   image.
 
-`tools/mutation.sh` plants eight deliberate bugs - the ones this project has
-actually made - and fails unless the suite catches each of them, so "0 failures"
-cannot quietly come from weak checks.
+`tools/mutation.sh` plants twenty deliberate bugs - the ones this project has
+actually made plus one per row of the instruction-set trap table in
+`docs/progress.md` - and fails unless the suite catches each of them, so
+"0 failures" cannot quietly come from weak checks.  A mutation that *survives*
+is treated as a hole in the harness rather than a win: the `memmove_nn` signed
+direction test is one that survived, which is why `tests/t_mem.c` now carries
+framebuffer cases where `src + n` wraps past 0xFFFF.
 
 `tools/audit.py` closes the other hole: a routine counts as translated because
 its address is annotated in `src/`, which says nothing about whether anything
@@ -61,10 +65,19 @@ mention ("the scanner at 0x0A568 rejects ...") cannot inflate the percentage.
 
 ```sh
 bash tools/test.sh          # audit, differential tests, cross-check
-bash tools/test.sh --quick  # differential tests only
+bash tools/test.sh --quick  # audit + differential tests only
+bash tools/test.sh --no-xcheck  # same, minus the cross-check, on purpose
 ./tools/mutation.sh         # prove the suite still catches planted bugs
 python3 tools/audit.py -v   # which routines are tested directly
 ```
+
+The cross-check is the only check that validates `emu/nx8.c` itself, and
+`emu/nx8.c` is the oracle every differential test compares against.  Skipping it
+silently would make "0 failures" mean "this project agrees with itself", so a
+missing reference emulator now **fails** the run; `--no-xcheck` skips it only
+when asked, and says so in what it prints.  (`machine/` is a submodule gitlink
+with no `.gitmodules` mapping at the moment, so `git submodule update --init
+machine` cannot find a URL until that is restored.)
 
 ### Adding a routine
 
@@ -87,6 +100,6 @@ must stay at `0 failures`.
 ### Progress
 
 `python3 tools/coverage.py` reports how much of the firmware has a verified C
-body (currently 20.8% of routines, 12.0% of instructions). See
+body (currently 31.3% of routines, 14.6% of instructions). See
 [`docs/progress.md`](docs/progress.md) for the details and the plan for the
 remaining work.

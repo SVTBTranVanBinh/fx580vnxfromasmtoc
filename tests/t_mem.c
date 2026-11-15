@@ -29,6 +29,9 @@ W0(record10_d010_to_d030)
 W0(record_high_byte_add5)
 W1(digit_0D009)
 W1(digit_at)
+W2(record_status_flag40_roundtrip)
+W2(record_status_digit_fixup)
+W2(record_pair_digit_merge)
 
 static void test_memcpy(void)
 {
@@ -70,6 +73,33 @@ static void test_memmove(void)
             check_ret("memmove_nn", r, c);
             check_mem_all("memmove_nn");
         }
+    }
+
+    /* `src + n` wrapping past 0xFFFF is the only place the ROM's direction
+     * test can be told apart from a plain unsigned comparison of the
+     * pointers: the ROM compares `er2` with `er0` and `er8` with `er0 + 2[er14]`
+     * using `bc ges`, which is the *signed* ordering, so an address pair where
+     * one side is above 0x8000 and the sum wraps flips the direction.  Every
+     * pair here lives in the LCD framebuffer, the only writable window that
+     * high, so the two directions leave visibly different bytes behind.
+     * Without these cases an unsigned direction test passed the whole suite. */
+    static const struct {
+        uint16_t dst, src, n;
+    } wrap[] = {
+        {0xF900, 0xF880, 0x0800},   /* (A) and (B) both false signed */
+        {0xFC00, 0xF800, 0x0A00},
+        {0xFA00, 0xF900, 0x0700},   /* sum lands exactly on 0x10000 */
+        {0xF900, 0xFA00, 0x0700},
+    };
+    for (size_t k = 0; k < sizeof(wrap) / sizeof(wrap[0]); k++) {
+        random_image((uint32_t)(k + 950));
+        uint16_t dst = wrap[k].dst, src = wrap[k].src, n = wrap[k].n;
+        Args a = {.er = {dst, src}, .stk = {n}, .nstk = 1};
+        uint16_t r = run_rom_ex(0x0A8AA, &a, "memmove_nn wrap", NULL);
+        begin_c();
+        uint16_t c = memmove_nn(after_c, dst, src, n);
+        check_ret("memmove_nn wrap", r, c);
+        check_mem_all("memmove_nn wrap");
     }
 }
 
@@ -367,7 +397,80 @@ static void test_record10_moves(void)
         {"record_high_byte_add5", 0x1B286, "", a_record_high_byte_add5, 0},
         {"digit_0D009", 0x1C6AA, "w", a_digit_0D009, 0},
         {"digit_at", 0x1DAE2, "p", a_digit_at, 0},
+        {"record_status_flag40_roundtrip", 0x1DA62, "pp",
+         a_record_status_flag40_roundtrip, 0},
+        {"record_status_digit_fixup", 0x1DA12, "pp",
+         a_record_status_digit_fixup, 0},
+        {"record_pair_digit_merge", 0x1D9AC, "pp", a_record_pair_digit_merge, 0},
     );
+}
+
+/* The status byte at 0xD009 decides which of four paths 0x1DA62 and 0x1DA12
+ * take: 0, 0x40, 0xF0 and up, and the 0x80 nibble each behave differently, and
+ * 0x1DA12 compares 0x40 as a whole byte where 0x1DA62 tests the nibble.  A
+ * pointer sweep never draws all of those, so the byte is swept over all 256
+ * values - the same rule the argument tables follow.  Both the even and the odd
+ * source are tried, because the record load rounds the address down while the
+ * pointer saved for the write-back does not. */
+static void test_record_status_paths(void)
+{
+    for (unsigned status = 0; status < 256; status++) {
+        for (int variant = 0; variant < 2; variant++) {
+            random_image((uint32_t)(0x1B0000u + status * 2u + (unsigned)variant));
+            uint16_t src = (uint16_t)(0xD200 + variant);
+            image[(uint16_t)(src & 0xFFFEu)] = (uint8_t)status;
+            Args a = {.er = {src, 0x1234}, .nstk = 0};
+
+            uint16_t r = run_rom(0x1DA62, &a, "record_status_flag40_roundtrip");
+            begin_c();
+            uint16_t c = record_status_flag40_roundtrip(after_c, src, 0x1234);
+            check_ret("record_status_flag40_roundtrip", r, c);
+            check_mem_all("record_status_flag40_roundtrip");
+
+            random_image((uint32_t)(0x1C0000u + status * 2u + (unsigned)variant));
+            image[(uint16_t)(src & 0xFFFEu)] = (uint8_t)status;
+            r = run_rom(0x1DA12, &a, "record_status_digit_fixup");
+            begin_c();
+            c = record_status_digit_fixup(after_c, src, 0x1234);
+            check_ret("record_status_digit_fixup", r, c);
+            check_mem_all("record_status_digit_fixup");
+        }
+    }
+}
+
+/* 0x1D9AC decides from *two* status bytes at once: 0xF0 and up on either side,
+ * a zero second status and the unsigned `r1 < 5` test each lead somewhere else,
+ * and the answer's high half comes from whichever branch ran.  The cross product
+ * of the interesting status bytes is 256 cases, which is cheap enough to run in
+ * full, with the record's second byte swept over the four values the `r1 < 5`
+ * compare needs (below, at the boundary, either side of it). */
+static void test_record_pair_status_paths(void)
+{
+    static const uint8_t statuses[] = {0x00, 0x01, 0x0A, 0x3F, 0x40, 0x4F,
+                                       0x7F, 0x80, 0x8F, 0x90, 0xEF, 0xF0,
+                                       0xF3, 0xFF};
+    static const uint8_t seconds[] = {0x00, 0x04, 0x05, 0x06, 0x85};
+
+    for (size_t a = 0; a < sizeof(statuses); a++) {
+        for (size_t b = 0; b < sizeof(statuses); b++) {
+            for (size_t k = 0; k < sizeof(seconds); k++) {
+                uint16_t src_a = 0xD200, src_b = 0xD300;
+                Args args = {.er = {src_a, src_b}, .nstk = 0};
+
+                random_image((uint32_t)(0x1D0000u + a * 700u + b * 7u + k));
+                image[src_a] = statuses[a];
+                image[(uint16_t)(src_a + 1)] = (uint8_t)(0x10 + a);
+                image[src_b] = statuses[b];
+                image[(uint16_t)(src_b + 1)] = seconds[k];
+
+                uint16_t r = run_rom(0x1D9AC, &args, "record_pair_digit_merge");
+                begin_c();
+                uint16_t c = record_pair_digit_merge(after_c, src_a, src_b);
+                check_ret("record_pair_digit_merge", r, c);
+                check_mem_all("record_pair_digit_merge");
+            }
+        }
+    }
 }
 
 /* 0x17CA6 takes both addresses from er12/er14, and 0x13B86/0x14BCC read the
@@ -874,6 +977,8 @@ void test_mem(void)
 {
     test_small_leaves();
     test_record10_moves();
+    test_record_status_paths();
+    test_record_pair_status_paths();
     test_record10_from_frame();
     test_record10_index();
     test_complement32();

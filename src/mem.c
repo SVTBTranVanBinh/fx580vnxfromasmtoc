@@ -925,6 +925,18 @@ static uint8_t bcd_adjust(uint8_t value, int half_carry, int carry)
     return (uint8_t)(value + adjust);
 }
 
+/* `add rX, 5 ; daa rX ; and rX, 15` - the digit step shared by 0x1B286 and
+ * 0x1DA12.  The half-carry is the one taken out of the low nibble, and the
+ * `and` at the end keeps the digit alone. */
+static uint8_t bcd_plus5_digit(uint8_t value)
+{
+    unsigned half = ((unsigned)(value & 0x0Fu) + 5u) >> 4;
+    unsigned sum = (unsigned)value + 5u;
+
+    return (uint8_t)(bcd_adjust((uint8_t)sum, (int)(half & 1u), sum > 0xFFu) &
+                     0x0Fu);
+}
+
 /* 0x1B286 - the record byte add itself. */
 uint16_t record_high_byte_add5(uint8_t *ds)
 {
@@ -1117,4 +1129,121 @@ uint16_t high_nibble_into_r5(uint8_t *ds, uint16_t arg, uint8_t r4,
     if (r2)
         *r2 = 3;
     return arg;
+}
+
+/* 0x1DA62 - load the record at `src` through the display byte order, clear the
+ * 0x40 status bit, hand it back through the same order and answer the packed
+ * digit.
+ *
+ * The prologue is `lea [d_0D05C] ; st xr0, [ea+]`: the caller's er0..er3 are
+ * saved at 0xD05C..0xD05F, and 0xD05C is exactly the pointer 0x1C674 writes the
+ * record back through - so the destination is the *source* pointer, unmasked,
+ * and the four saved bytes are part of the result the diff-test compares.
+ *
+ * `mov r1, r0 ; and r1, 240 ; cmp r1, 64` tests the whole high nibble, so
+ * 0x40..0x4F all take the branch; the clear that follows is `and r0, 191`,
+ * i.e. bit 6 alone.  When the branch is not taken nothing is stored, and er0's
+ * high half is still the caller's - which is why the answer is the digit in the
+ * low byte and `src >> 8` above it. */
+uint16_t record_status_flag40_roundtrip(uint8_t *ds, uint16_t src, uint16_t spare)
+{
+    uint16_t carry;
+
+    ds_store16(ds, 0xD05Cu, src);
+    ds_store16(ds, 0xD05Eu, spare);
+    (void)record10_permute(ds, 0xD000u, src, record_swap_in, 1);
+
+    if ((uint8_t)(ds[0xD009] & 0xF0u) == 0x40u) {
+        ds_store(ds, 0xD009u, (uint8_t)(ds[0xD009] & 0xBFu));
+        carry = record_to_pointer(ds);
+    } else {
+        /* `mov r1, r0 ; and r1, 240` overwrote the caller's high half, so the
+         * answer here is (status & 0xF0) << 8, not src >> 8. */
+        carry = (uint16_t)((uint16_t)(ds[0xD009] & 0xF0u) << 8);
+    }
+    return digit_0D009(ds, carry);
+}
+
+/* 0x1DA12 - the same round trip with the status byte decoded first.  Three
+ * values skip the work entirely: 0, 0x40 (compared as a *whole byte* here, so
+ * unlike 0x1DA62 only 0x40 itself and not 0x41..0x4F) and anything 0xF0 and
+ * up (`bc ge` is unsigned).  Everything else adds five in BCD to the record's
+ * second byte - or, when the high nibble of the status is 0x8, to the low byte
+ * first and to the high byte only if the low one was not already zero. */
+uint16_t record_status_digit_fixup(uint8_t *ds, uint16_t src, uint16_t spare)
+{
+    uint8_t status;
+    uint16_t carry;
+
+    ds_store16(ds, 0xD05Cu, src);
+    ds_store16(ds, 0xD05Eu, spare);
+    (void)record10_permute(ds, 0xD000u, src, record_swap_in, 1);
+
+    status = ds[0xD009];
+    carry = src;
+
+    if (status != 0 && status < 0xF0u && status != 0x40u) {
+        uint16_t word = (uint16_t)(ds[0xD000] | ((uint16_t)ds[0xD001] << 8));
+        uint8_t low = (uint8_t)word;
+        uint8_t high = (uint8_t)(word >> 8);
+
+        if ((uint8_t)(status & 0xF0u) == 0x80u) {
+            low = bcd_plus5_digit(low);
+            if (high != 0)
+                high = bcd_plus5_digit(high);
+        } else {
+            high = bcd_plus5_digit(high);
+        }
+        ds_store16(ds, 0xD000u, (uint16_t)(((uint16_t)high << 8) | low));
+        carry = (uint16_t)(ds[0xD000] | ((uint16_t)ds[0xD001] << 8));
+        (void)record_to_pointer(ds);
+    }
+    return digit_0D009(ds, carry);
+}
+
+/* 0x1D9AC - load both records from the caller's two pointers, compare their
+ * status bytes and answer a packed digit.
+ *
+ * Four exits, and each one hands a *different* r1 to 0x1C6AA, which keeps the
+ * high half: at the first two the half is still the high byte of `src_a`
+ * because nothing but a byte load happened in between; after either zeroing
+ * path 0x1C674 returns the high byte of the (zeroed) record, i.e. 0; and in the
+ * last group the half is the record's own second byte, five added in BCD when
+ * the sequence gets that far.  That is why `carry` is threaded through every
+ * branch instead of being recomputed at the end. */
+uint16_t record_pair_digit_merge(uint8_t *ds, uint16_t src_a, uint16_t src_b)
+{
+    uint16_t carry;
+    uint16_t word;
+
+    ds_store16(ds, 0xD05Cu, src_a);
+    ds_store16(ds, 0xD05Eu, src_b);
+    carry = records_from_pointers(ds, src_a, src_b);
+
+    if (ds[0xD009] >= 0xF0u)
+        return digit_0D009(ds, carry);
+
+    if (ds[0xD019] >= 0xF0u) {
+        (void)record_reset_flag38(ds);
+        return digit_0D009(ds, record_to_pointer(ds));
+    }
+
+    if (ds[0xD019] == 0) {
+        for (int i = 0; i < 10; i++)
+            ds_store(ds, (uint16_t)(0xD000u + i), 0);
+        return digit_0D009(ds, record_to_pointer(ds));
+    }
+
+    /* `l er0, [d_0D010] ; cmp r1, 5 ; bc lt` - unsigned, so 0x80..0xFF here
+     * stops the sequence at the digit step as well. */
+    carry = (uint16_t)(ds[0xD010] | ((uint16_t)ds[0xD011] << 8));
+    if ((uint8_t)(carry >> 8) < 5u || ds[0xD009] == 0)
+        return digit_0D009(ds, carry);
+
+    word = (uint16_t)(ds[0xD000] | ((uint16_t)ds[0xD001] << 8));
+    word = (uint16_t)((word & 0x00FFu) |
+                      ((uint16_t)bcd_plus5_digit((uint8_t)(word >> 8)) << 8));
+    ds_store16(ds, 0xD000u, word);
+    (void)record_to_pointer(ds);
+    return digit_0D009(ds, word);
 }

@@ -52,8 +52,8 @@ on the same partition:
 
 | metric | current |
 | --- | --- |
-| routines | 235 / 761 (30.9%) |
-| instructions | 4683 / 32749 (14.3%) |
+| routines | 238 / 761 (31.3%) |
+| instructions | 4772 / 32749 (14.6%) |
 
 (Measured with `python3 tools/coverage.py`; the instruction total counts the
 ret/rt-delimited bodies the tooling treats as one routine each, not every word
@@ -89,6 +89,8 @@ the core manual (`resource/nX-U8100 Core Instruction Manual.txt`) or against
 | 16-bit shifts | written as an `sllc`/`sll` or `srlc`/`srl` pair on two adjacent bytes; the high byte first for a left shift and the low byte first for a right one, and the carry chains the halves | `op_sllc` / `op_srlc` in `emu/nx8.c`, confirmed by tracing `0x09834` |
 | subtracting a constant | `add rX, 240..255` then `bc lt` is a subtract that branches on the borrow: the branch is taken when the *carry out* is set, i.e. when the old value was ≥ the complement | traced at `0x098D6` in `0x09834` |
 | `BC AL` | condition nibble 14 really is unconditional; a backward `bc al` is a plain loop jump and the exit test sits at the loop head | §3.3 condition table (1000..1110 = NE, EQ, NV, OV, PS, NS, AL) |
+| `bl` and the stack | `bl` pushes **nothing** - it sets the link registers `lr`/`lcsr` - while `pop pc` pops **four** bytes (pc and csr).  So `push <word> ; push <word> ; bl f_1FFFE` (a callee whose body is a bare `pop pc`) does not return to its caller at all: the two pushed words *become* the new pc and csr and control goes to the address the caller stacked.  `0x2FFC6` is that shape, and it can never be diff-tested | `emu/nx8.c` (`H_PUSHL` covers `push lr` only; `nx8_call` sets `lr`/`lcsr` for `bl`) |
+| a status byte reused as the answer's high half | `mov r1, r0 ; and r1, 240 ; cmp r1, 64` destroys the caller's r1 on the way to the compare, so the routine it ends in answers `(status & 0xF0) << 8` and not `arg & 0xFF00` (`0x1DA62`); its neighbour `0x1D9AC` keeps the caller's high byte on the first two exits and answers the record's own byte on the last - four exits, three different high halves | both routines' diff-tests; the trap is invisible to a pointer sweep, so the status byte is swept over all 256 values |
 
 Consequence worth stating once: a block copy must not read and write one byte at
 a time.  The ROM loads ten bytes into `er6`+`qr8`, stores them, and only then
@@ -144,7 +146,7 @@ written by hand:
 
 ## Where the remaining work is
 
-The call graph is the schedule. `tools/frontier.py` currently reports 137
+The call graph is the schedule. `tools/frontier.py` currently reports 123
 routines that are ready (every dependency already translated), and the count
 grows as routines land, so the work does not run out.  `-a` lists them by size;
 the cheapest tier is still ~60 routines of fourteen instructions or fewer.
@@ -183,7 +185,7 @@ instruction percentage fastest, because those routines are big.
 ## A note on the 30% target
 
 30% of the instruction total is roughly 9800 instructions; at the
-current 13.1% the project is ~4300 instructions in. Reaching 30% therefore means
+current 14.6% the project is ~4800 instructions in. Reaching 30% therefore means
 translating on the order of 300 more routines, and the ones that are left are
 bigger and more entangled than the ones done so far (the easy leaf
 functions and hardware pokes are largely gone). Work in batches with
