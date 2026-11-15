@@ -37,4 +37,7 @@ uint16_t clear_secondary_input_range(uint8_t *ds);
 /* 0x2F73E - clear mode-dependent temporary state. */
 void reset_mode_state(uint8_t *ds);
 
+/* 0x09A6A - rebuild the screen state for a fresh mode. */
+void screen_reinit(uint8_t *ds);
+
 #endif

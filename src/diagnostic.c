@@ -4,8 +4,10 @@
 #include <stddef.h>
 
 #include "display.h"
+#include "hw.h"
 #include "keyboard.h"
 #include "print.h"
+#include "runtime.h"
 
 #define FONT_SIZE_ADDR 0xD137u
 
@@ -151,4 +153,37 @@ void reset_mode_state(uint8_t *ds)
     if (mode == 193 || mode == 2 || mode == 196 || mode == 137)
         memset_n(ds, 0xD392, 0, 400);
     clear_secondary_input_range(ds);
+}
+
+/* 0x09A6A - rebuild the screen state for a fresh mode.  The fourteen bytes it
+ * writes are the mode byte 0xD114, the two screen-buffer selectors, the
+ * record-alignment pair 0xD10E and a run of flags; 0xD0F4 takes the diagnostic
+ * byte 0xF050 so an error latched at reset survives into the first draw. */
+void screen_reinit(uint8_t *ds)
+{
+    ds[0xD114] = 1;
+    ds[0xD0F7] = 0;
+    ds[0xD13A] = 0;
+    ds[0xD13F] = 0;
+    ds[0xD10E] = 0x26;
+    ds[0xD10F] = 0xFC;
+    ds[0xD142] = 0;
+    ds[0xD164] = 0;
+    ds[0xD165] = 0;
+    ds[0xD141] = 0;
+    ds[0xD110] = (uint8_t)(ds[0xD110] & 0x80u);
+    ds[0xD138] = 0;
+    ds[0xD139] = 1;
+    ds[0xD0F4] = (uint8_t)read_0F050(ds);
+    ds[0xD113] = 0;
+
+    /* 0x0A0D4 is only the tail of 0x0A0AA: `st r0, [0xF032]; rt`.  The `mov
+     * r0, 20` sits *before* the label, so the contrast takes whatever r0 holds
+     * here - the 0xD153 byte the routine loaded two instructions ago. */
+    ds[0xF032] = ds[0xD153];
+    reset_flags_and_state(ds, 0);   /* 0x2AB3C */
+    buffer_clear(ds);               /* 0x08C60 */
+    reset_mode_state(ds);           /* 0x2F73E */
+    mode136_row_clear(ds, 0);       /* 0x2980E */
+    render_ddd4(ds);                /* 0x0947C, and its er0 is the answer */
 }

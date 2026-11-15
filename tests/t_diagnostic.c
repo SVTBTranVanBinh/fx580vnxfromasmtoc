@@ -68,6 +68,27 @@ void test_diagnostic(void)
         }
     }
 
+    /* 0x09A6A answers with whatever the last callee left in er0, so the whole
+     * data space and the SFR block are what the test can hold it to.  The two
+     * mode-dependent branches of `reset_mode_state` and mode 136 of
+     * `mode136_row_clear` are both swept. */
+    {
+        static const uint8_t modes[] = {0, 2, 136, 137, 193, 196, 255};
+
+        for (size_t k = 0; k < sizeof(modes); k++) {
+            for (uint32_t seed = 0; seed < 2; seed++) {
+                random_image(0xD1AB00u + (uint32_t)k * 4 + seed);
+                image[0xD111] = modes[k];
+                Args args = {.nstk = 0};
+                run_rom(0x09A6A, &args, "screen_reinit");
+                begin_c();
+                screen_reinit(after_c);
+                check_mem_all("screen_reinit");
+                check_mem("screen_reinit", 0xF000, 0xF100);
+            }
+        }
+    }
+
     for (uint32_t seed = 0; seed < 3; seed++) {
         random_image(0xD1A600u + seed);
         Args args = {.nstk = 0};
