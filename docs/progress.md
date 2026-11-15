@@ -52,8 +52,8 @@ on the same partition:
 
 | metric | current |
 | --- | --- |
-| routines | 252 / 761 (33.1%) |
-| instructions | 5131 / 32749 (15.7%) |
+| routines | 253 / 761 (33.2%) |
+| instructions | 5312 / 32749 (16.2%) |
 
 (Measured with `python3 tools/coverage.py`; the instruction total counts the
 ret/rt-delimited bodies the tooling treats as one routine each, not every word
@@ -93,6 +93,7 @@ the core manual (`resource/nX-U8100 Core Instruction Manual.txt`) or against
 | a status byte reused as the answer's high half | `mov r1, r0 ; and r1, 240 ; cmp r1, 64` destroys the caller's r1 on the way to the compare, so the routine it ends in answers `(status & 0xF0) << 8` and not `arg & 0xFF00` (`0x1DA62`); its neighbour `0x1D9AC` keeps the caller's high byte on the first two exits and answers the record's own byte on the last - four exits, three different high halves | both routines' diff-tests; the trap is invisible to a pointer sweep, so the status byte is swept over all 256 values |
 | the glyph buffer past the font's own rows | `0x0904C` keeps its glyph bitmap in its **own stack frame**, so with a font size other than 10 or 14 the rows past the extractor's fill are whatever the data space held at that address - filling `0xEC00..0xECFF` with 0xAA makes the ROM draw 0xAA rows.  The C clears the bitmap and reads zero past its end, which is deterministic but cannot match the ROM there: the ROM's answer depends on the stack pointer, not on the data space alone.  Only 10 and 14 are in domain (`0x099E4` and `0x2086C` are the two writers of `0xD137`) and they fill exactly as many rows as `height` asks for, so the divergence is unreachable from the firmware | `tools/screen_demo.lua` (font size 0) versus `tools/screen_demo.c`; the C side now pins the font at 14 |
 | a save window that pops back | `0x1C952` pushes `qr0`, `qr0`, `xr0` - 8 + 8 + 4 bytes from `0xD03C`, `0xD044`, `0xD04C`, because `[ea+]` bumps by the *group* size - and pops all twenty bytes back, so everything the body writes in `0xD03C..0xD04F` is invisible: replayed pop by pop, the three chunks land one slot off and six bytes of the record look wrong.  Snapshot the window instead and model only what the body reads out of it |
+| a record slid through a staging window | `0x1BCDE`/`0x1BD68`/`0x1BE00` stage the ten-byte record at `0xD03C` behind one zero, then reload from `0xD03C + count/2` (the divide) or `0xD045 - count/2` (the multiply) and shift four more bits when the count is odd.  The index that falls off the front reads a zeroed byte and the one that runs past the end reads the zero the staging put there, so the answer is `record[k + half]` / `record[k - half]` with zeros outside 1..9 - and the multiply also clears the record's top byte while the divide keeps it |
 | `sub` + `das` as a five test | `0x1CA30` subtracts five from the low half of `0xD001`, masks the byte again and repeats until the subtraction stops borrowing, then branches on 0, 2 or less.  `DAS` adjusts **both** nibbles (`0x0A` becomes `0x04`), so the answer is not `k % 5` for `k >= 10`: 0..4 loop once and come back as themselves, 5..14 give `k - 5`, 15 gives 4 |
 | the answer's high half | `0x08FEE` writes only r0, so `line_print`'s `count` comes back in r0 and whatever r1 held at the end in r1: one more than `char_print`'s row count (0x0E for the 14-pixel font, 0x0A for the 10-pixel one, one less for the wide markers 241/242), the arguments untouched when `char_print` was off screen (`x > 191`, or `y >= 64`), the buffer end 0xE3D3/0xE9D3 when the row loop ran off the bottom, and the caller's y when nothing was drawn at all.  The control character 1 inherits the half from its **own** `char_print`, which draws two pixels to the left - so at x = 0 or 1 it is off screen and r1 stays at y | `char_print`, `char_print_1byte`, `line_print` and `line_print.col_0` diff-tests, all four compared as full words since this row was written |
 
@@ -147,10 +148,15 @@ written by hand:
   `check_mem_all()` skips, so the range is compared explicitly (`0x23F8A`);
 * the routine returns through `pop pc`, which pops four bytes (pc and csr), so
   the harness has to stack a return address and a zero csr (`0x1FFFE`).
+* an entry above `0xFFFF` does not fit a `uint16_t` field in a test table:
+  `{0x1BCDE, fn}` truncates to `0xBCDE` and the ROM runs into the middle of
+  an unrelated routine, which the harness reports as `unrecognized
+  instruction` at a plausible-looking `pc` rather than as a bad address
+  (`0x1BCDE`'s first test run).
 
 ## Where the remaining work is
 
-The call graph is the schedule. `tools/frontier.py` currently reports 111
+The call graph is the schedule. `tools/frontier.py` currently reports 115
 routines that are ready (every dependency already translated), and the count
 grows as routines land, so the work does not run out.  `-a` lists them by size;
 the cheapest tier is still ~60 routines of fourteen instructions or fewer.

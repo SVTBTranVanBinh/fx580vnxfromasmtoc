@@ -787,6 +787,78 @@ out:
     return (uint16_t)(((uint16_t)ret_hi << 8) | ret_lo);
 }
 
+/* 0x1BCDE, 0x1BD68 and 0x1BE00 are one body three times.  The ten-byte record
+ * at `base` is staged in the 0xD03C window - which the entry pushes and the
+ * exit pops, so nothing in it survives - reloaded from an address slid by half
+ * the digit count in 0xD00B, and shifted four bits further when that count is
+ * odd: the record moves one decimal place per count.  `left` picks the
+ * multiply (0x1BD68) over the divide (0x1BCDE/0x1BE00); the multiply also
+ * clears the record's top byte, while the divide keeps it. */
+static uint16_t record10_shift(uint8_t *ds, uint8_t *r, uint16_t base, int left)
+{
+    uint8_t record[10], count, half, ret_lo, ret_hi, i;
+
+    ret_lo = ds[0xD03C];
+    ret_hi = ds[0xD03D];
+    count = ds[0xD00B];
+    if (count == 0)
+        goto out;
+    if (count >= 19) {
+        count = 18;
+        ds_store(ds, 0xD00B, count);
+    }
+    for (i = 0; i < 10; i++)
+        record[i] = ds[(uint16_t)(base + i)];
+    half = (uint8_t)(count >> 1);
+
+    /* the window holds record[1..9] behind one zero, and the reload starts
+     * `half` bytes into it: what falls off the front reads as a zero and what
+     * runs past record[9] is past the staging area, which is zero as well */
+    for (i = 1; i <= 9; i++) {
+        int index = left ? (int)i - (int)half : (int)i + (int)half;
+
+        r[i] = (index >= 1 && index <= 9) ? record[index] : 0;
+    }
+    if (count & 1) {
+        if (left)
+            shift_r1_r9_left4(ds, r);
+        else
+            shift_r1_r9_right4(ds, r);
+    }
+    r[0] = left ? 0 : record[0];
+    for (i = 0; i < 10; i++)
+        ds_store(ds, (uint16_t)(base + i), r[i]);
+
+    /* 0x1BD08 loads r8..r15 from just above the record, so r10..r15 come back
+     * as the six bytes above its top and r8/r9 as the shifted pair */
+    for (i = 10; i < 16; i++)
+        r[i] = ds[(uint16_t)(base + i)];
+
+out:
+    /* the exit pops the window back over r0..r7 */
+    for (i = 0; i < 8; i++)
+        r[i] = ds[(uint16_t)(0xD03C + i)];
+    return (uint16_t)(((uint16_t)ret_hi << 8) | ret_lo);
+}
+
+/* 0x1BCDE - the 0xD030 record divided by ten `0xD00B` times. */
+uint16_t record10_shift_right_d030(uint8_t *ds, uint8_t *r)
+{
+    return record10_shift(ds, r, 0xD030u, 0);
+}
+
+/* 0x1BD68 - the same record multiplied. */
+uint16_t record10_shift_left_d030(uint8_t *ds, uint8_t *r)
+{
+    return record10_shift(ds, r, 0xD030u, 1);
+}
+
+/* 0x1BE00 - the 0xD010 record divided. */
+uint16_t record10_shift_right_d010(uint8_t *ds, uint8_t *r)
+{
+    return record10_shift(ds, r, 0xD010u, 0);
+}
+
 /* The two record handovers below are not straight copies: they convert between
  * the numeric record at 0xD000 and the display buffer, and the conversion is a
  * byte-order change.  Reading the record as five big-endian words, words 1..4

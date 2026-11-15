@@ -769,6 +769,56 @@ static void test_record10_normalise(void)
                           (uint8_t)bias);
 }
 
+/* 0x1BCDE / 0x1BD68 / 0x1BE00 slide a ten-byte record by `0xD00B` decimal
+ * places.  The count sweeps past both ends (0 and 18 are the guards, 19 and up
+ * clamp), and the staging window 0xD03C..0xD04F is filled with litter so a
+ * translation that forgets the final restore is caught by the whole-memory
+ * compare rather than passing on a coincidentally empty window. */
+static void one_scale(uint32_t seed, uint32_t addr,
+                      uint16_t (*fn)(uint8_t *, uint8_t *), uint8_t count)
+{
+    uint8_t regs[16], mine[16];
+    Args a = {.nstk = 0};
+
+    random_image(seed);
+    image[0xD00B] = count;
+    for (int i = 0; i < 10; i++) {
+        image[0xD010 + i] = (uint8_t)(image[0xD010 + i] | 0x11);
+        image[0xD030 + i] = (uint8_t)(image[0xD030 + i] | 0x22);
+    }
+    for (int i = 0; i < 16; i++) {
+        regs[i] = image[0xD100 + i];
+        mine[i] = regs[i];
+        a.er[i / 2] = (uint16_t)(a.er[i / 2] |
+                                 ((uint16_t)regs[i] << ((i % 2) * 8)));
+    }
+
+    uint16_t rom_ret = run_rom(addr, &a, "record10_shift");
+    begin_c();
+    uint16_t c_ret = fn(after_c, mine);
+    check_ret("record10_shift", rom_ret, c_ret);
+    check_mem("record10_shift", 0xD000, 0xD050);
+    check_mem_all("record10_shift");
+    check_regs("record10_shift", mine, 0xFFFFu);
+}
+
+static void test_record10_shift(void)
+{
+    static const uint8_t counts[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
+                                     17, 18, 19, 20, 200};
+    struct { uint32_t addr; uint16_t (*fn)(uint8_t *, uint8_t *); } entries[] = {
+        {0x1BCDE, record10_shift_right_d030},
+        {0x1BD68, record10_shift_left_d030},
+        {0x1BE00, record10_shift_right_d010},
+    };
+
+    for (size_t e = 0; e < sizeof(entries) / sizeof(entries[0]); e++)
+        for (size_t c = 0; c < sizeof(counts); c++)
+            for (int repeat = 0; repeat < 3; repeat++)
+                one_scale(0xE2000u + (uint32_t)(e * 256 + c * 8 + repeat),
+                          entries[e].addr, entries[e].fn, counts[c]);
+}
+
 /* 0x1C63E loads 0xD010 from the second argument before 0xD000 from the first,
  * so a source that overlaps the records sees the first half's writes. */
 static void test_records_from_pointers(void)
@@ -1057,6 +1107,7 @@ void test_mem(void)
     test_record10_copy_if_present();
     test_record_reset_flag38();
     test_record10_normalise();
+    test_record10_shift();
     test_records_from_pointers();
     test_record_to_pointer();
     test_record10_er8_from_er4();
