@@ -91,6 +91,25 @@ emulator loads is built on the fly under `build/models/fx580vnx_emu`: it is a
 copy of `machine/models/fx580vnx_emu` with `rom.bin` symlinked to
 `resource/rom.bin`, because a ROM must not be committed into the submodule.
 
+### Watching the firmware draw
+
+`tools/screen_demo.lua` runs four drawing calls in CasioEmu and dumps the 1536-byte
+screen buffer; `tools/screen_demo.c` runs the same four through the C translations,
+so the two pictures can be compared byte for byte:
+
+```sh
+gcc -std=c11 -O2 -o build/screen_demo tools/screen_demo.c src/*.c emu/nx8.c -I src
+./build/screen_demo > build/fb_c.txt
+( cd machine && SDL_VIDEODRIVER=dummy emulator/build/emulator \
+    model=../build/models/fx580vnx_emu script=../tools/screen_demo.lua \
+    | grep -E '^[0-9A-F]{2} ' > ../build/fb_rom.txt )
+cmp build/fb_c.txt build/fb_rom.txt
+```
+
+The C side has to load `resource/rom.bin` into `0x0000..0xCFFF` first: below
+`0xD000` the data space *is* the ROM window and the font bitmaps live there, so a
+zeroed buffer draws no glyphs at all.
+
 ### Adding a routine
 
 ```sh

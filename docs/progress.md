@@ -181,6 +181,7 @@ The arithmetic core is the largest single block and the most intricate: it is
 at `0xD000`/`0xD010` (see `compare_bcd_records` and `decimal_record_predicate`
 in `src/mem.c` for the flavour). Translating it is what will move the
 instruction percentage fastest, because those routines are big.
+| the glyph buffer past the font's own rows | `0x0904C` keeps its glyph bitmap in its **own stack frame**, so with a font size other than 10 or 14 the rows past the extractor's fill are whatever the data space held at that address.  `tools/screen_demo.lua` (font size 0) shows it: the ROM draws 0xAA rows when 0xEC00..0xECFF is filled with 0xAA, while the C reads host stack garbage.  Only 10 and 14 are in domain - `0x099E4` and `0x2086C` are the two writers of 0xD137 - and every test sets one of those two for that reason | `tools/screen_demo.lua` and `tools/screen_demo.c`, `char_print` in `src/print.c` |
 
 ## A note on the 30% target
 
