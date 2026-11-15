@@ -9,6 +9,7 @@ W1(row_count_over_limit)
 W1(init_descriptor_record)
 W2(mul16)
 W1(shift_until_carry)
+/* scale_pair_or_clear takes the register file, like the shifts above */
 W1(pitch_from_state)
 W1(tall_metric_from_font)
 W1(small_metric_from_font)
@@ -48,6 +49,22 @@ static void test_register_shifts(void)
 {
     static const uint16_t masks[] = {0x0001, 0x00FF, 0x0100, 0x7F7F, 0xFF80,
                                      0xA5A5, 0xFFFF, 0xF0F0};
+
+    /* 0x180B0 scales the r10/r11 pair, so the sweep has to reach counts on both
+     * sides of the ten that selects the path, the wrap at 0xFF, and every
+     * high byte. */
+    for (unsigned lo = 0; lo < 256; lo += 3) {
+        for (unsigned hi = 0; hi < 256; hi += 17) {
+            uint8_t er[16];
+
+            for (int b = 0; b < 16; b++)
+                er[b] = (uint8_t)(lo * 7u + (unsigned)b * 31u + hi);
+            er[10] = (uint8_t)lo;
+            er[11] = (uint8_t)hi;
+            one_shift(0x180B0, "scale_pair_or_clear", scale_pair_or_clear, er,
+                      0x0FFFu, 0x180B0u + lo * 65536u + hi);
+        }
+    }
 
     for (size_t m = 0; m < sizeof(masks) / sizeof(masks[0]); m++) {
         uint8_t er[16];

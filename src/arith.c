@@ -367,3 +367,46 @@ void print_indexed_rows(uint8_t *ds, uint16_t buffer)
         ds[label]++;
     }
 }
+
+/* 0x180B0 - scale a sixteen-bit value held in the r10/r11 pair by sixteen, or
+ * clear the working registers.
+ *
+ * A count byte of ten or more takes the scale, but not of the caller's value:
+ * `mov r11, 0` empties the pair's high byte first, so only r10 survives into the
+ * shift.  `sllc r11, 4` then shifts the sixteen bits of the r11:r10 pair and
+ * stores the top eight back in r11, and `sll r10, 4` finishes the low half - the
+ * whole pair moves left four bits, which for a cleared high byte is r10 << 4.
+ * The
+ * answer is `mov r0, r11 ; mov r1, r10`, i.e. er0 = (r10 << 8) | r11, the halves
+ * the other way round from the register pair.  Below ten the callee clears the
+ * working registers instead and r0 keeps r10.
+ *
+ * `cmp r10, 10 ; bc ge` is unsigned, so 0x80..0xFF scale too.  The callee leaves
+ * r9 = 1 on both paths - not 0 - and r8 = 1 only on the scaling path. */
+uint16_t scale_pair_or_clear(uint8_t *ds, uint8_t *r)
+{
+    (void)ds;
+    if (r[10] >= 10u) {
+        unsigned pair;
+
+        r[11] = 0;                       /* `mov r11, 0` before the shift */
+        pair = ((unsigned)r[10] << 4) & 0xFFFFu;
+        r[10] = (uint8_t)pair;           /* the pair is r11 high, r10 low */
+        r[11] = (uint8_t)(pair >> 8);
+        /* Both paths call the register clear, so r0..r7 come back zero; the
+         * shifted half is the only thing written after it. */
+        for (int i = 0; i < 8; i++)
+            r[i] = 0;
+        r[8] = 1;
+        r[9] = 1;
+        r[0] = r[11];
+        r[1] = r[10];
+        return (uint16_t)(((uint16_t)r[1] << 8) | r[0]);
+    }
+    for (int i = 0; i < 8; i++)
+        r[i] = 0;
+    r[8] = 0;
+    r[9] = 1;
+    r[0] = r[10];
+    return r[0];
+}

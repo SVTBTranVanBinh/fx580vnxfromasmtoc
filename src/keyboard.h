@@ -31,7 +31,7 @@
 #define RAM_0D150 0xD150u
 
 /* 0x09F3A - program the timer for a wait of `interval` ticks. */
-void timer_delay(uint8_t *ds, uint16_t interval);
+uint16_t timer_delay(uint8_t *ds, uint16_t interval);
 
 /* 0x23C94 - a wait of one tick, then straight back with the caller's er0.
  * 0x23CA4 is its ten-tick twin, but nothing was translated behind that one yet. */

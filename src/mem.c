@@ -1247,3 +1247,20 @@ uint16_t record_pair_digit_merge(uint8_t *ds, uint16_t src_a, uint16_t src_b)
     (void)record_to_pointer(ds);
     return digit_0D009(ds, word);
 }
+
+/* 0x18384 - copy thirty bytes from the record of the byte in r8 into the record
+ * of the byte in r9.  Both indices go through the times-ten record table, the
+ * destination first.
+ *
+ * The length is pushed as the fourth `memcpy_nn` argument and popped back
+ * afterwards, but 0x26FFA counts that argument *down in place* - `l er0,
+ * 2[er14] ; add er0, -1 ; st er0, 2[er14]` - so the slot holds 0 by the time
+ * the pop runs and the answer is 0, not 30. */
+uint16_t copy_record_30(uint8_t *ds, uint8_t src_index, uint8_t dst_index)
+{
+    uint16_t dst = record_10b_0DA40(ds, dst_index);
+    uint16_t src = record_10b_0DA40(ds, src_index);
+
+    (void)memcpy_nn(ds, dst, src, 30);
+    return 0;
+}

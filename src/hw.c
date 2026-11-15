@@ -615,3 +615,28 @@ uint16_t mode_state_update(uint8_t *ds, uint16_t arg)
     state_reset_0D119(ds);
     return (uint16_t)(arg & 0xFF00u);
 }
+
+/* 0x0A546 - "is the state byte's bit 6 set, or is the text at 0xD180 empty?".
+ * Two sixteen-bit details: `tb [d_0D116], 6` tests the bit and `mov er0, er0`
+ * is the ROM's sixteen-bit zero test on the length, not a no-op.  The answer is
+ * `mov r0, r4` over an r1 the length left behind, so the length's high byte
+ * survives as the answer's high half. */
+uint16_t flag_or_empty_0D180(uint8_t *ds)
+{
+    uint8_t flag = (uint8_t)((ds[0xD116] >> 6) & 1u);
+    uint16_t length = smart_strlen_n(ds, 0xD180u);
+
+    if (length == 0)
+        flag = 1;
+    return (uint16_t)((length & 0xFF00u) | flag);
+}
+
+/* 0x2F78C - true when the low byte of the argument is two, or is four.  Both
+ * answers are `mov r0, x` over the r1 that 0x28FB0 never wrote, so the caller's
+ * high half comes back unchanged. */
+uint16_t value_is_two_or_four(uint8_t *ds, uint16_t arg)
+{
+    if ((uint8_t)value_is_two(ds, arg) != 0 || (uint8_t)arg == 4u)
+        return (uint16_t)((arg & 0xFF00u) | 1u);
+    return (uint16_t)(arg & 0xFF00u);
+}

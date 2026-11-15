@@ -165,8 +165,16 @@ uint16_t find_char_in_stream(uint8_t *ds, uint16_t p, uint16_t target);
 /* hw.c - 0x2ACBE, 0x286A0 */
 uint16_t mode_code_from_flag(uint8_t *ds, uint16_t arg);
 uint16_t mode_state_update(uint8_t *ds, uint16_t arg);
-/* keyboard.c - 0x2EB66 */
+/* keyboard.c - 0x2EB66, 0x0E238 */
 uint16_t blink_countdown(uint8_t *ds, uint16_t ptr);
+uint16_t blink_countup(uint8_t *ds, uint16_t ptr);
+/* hw.c - extra leaves */
+uint16_t flag_or_empty_0D180(uint8_t *ds);
+uint16_t value_is_two_or_four(uint8_t *ds, uint16_t arg);
+/* arith.c - 0x180B0 */
+uint16_t scale_pair_or_clear(uint8_t *ds, uint8_t *r);
+/* mem.c - 0x18384 */
+uint16_t copy_record_30(uint8_t *ds, uint8_t src_index, uint8_t dst_index);
 uint16_t record10_er8_from_er4(uint8_t *ds, uint16_t src, uint16_t dst);
 uint16_t init_struct_30(uint8_t *ds, uint16_t frame);
 uint16_t record_kind_flag(uint8_t *ds, uint16_t arg);

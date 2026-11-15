@@ -19,7 +19,7 @@ static void wr16(uint8_t *ds, uint16_t a, uint16_t v)
     ds[(uint16_t)(a + 1)] = (uint8_t)(v >> 8);
 }
 
-void timer_delay(uint8_t *ds, uint16_t interval)
+uint16_t timer_delay(uint8_t *ds, uint16_t interval)
 {
     /* The firmware masks and unmask interrupts around the timer setup; that
      * has no effect on the data space, so it is not modelled here. */
@@ -38,8 +38,11 @@ void timer_delay(uint8_t *ds, uint16_t interval)
 
     /* When the key filter was not armed the whole sequence is repeated with
      * the firmware's short interval instead of the requested one. */
-    if (ds[SFR_KEY_IN_FILTER] != 0)
-        return;
+    if (ds[SFR_KEY_IN_FILTER] != 0) {
+        /* The poll that exits here loaded the filter byte into r0 and left r1
+         * at zero, so that byte is the answer. */
+        return ds[SFR_KEY_IN_FILTER];
+    }
 
     wr16(ds, SFR_TIMER_PRESCALE, 15);
     wr16(ds, SFR_TIMER_COUNTER, 0);
@@ -47,6 +50,10 @@ void timer_delay(uint8_t *ds, uint16_t interval)
     ds[SFR_TIMER_CONTROL] = 1;
     ds[SFR_0F014] = 0;
     ds[SFR_0F015] = 0;
+    /* This path ends on `mov r0, 158 / mov r1, 7`, and only r0 is zeroed
+     * afterwards, so the caller sees r1 = 7.  Nothing else in the routine
+     * touches r1 after that. */
+    return 0x0700;
 }
 
 /* 0x29B58 - blink the panel once: switch the display on, wait 1600 timer ticks
@@ -54,13 +61,16 @@ void timer_delay(uint8_t *ds, uint16_t interval)
  * toggles go through the label at 0x0A146 inside 0x0A128's body. */
 uint16_t display_pulse(uint8_t *ds, uint16_t arg)
 {
+    uint16_t waited;
+
     (void)arg;
     (void)display_enable_set(ds, 1);
-    timer_delay(ds, 0x0640);
+    waited = timer_delay(ds, 0x0640);
     (void)display_enable_set(ds, 0);
     /* er0 comes back from the delay, not from this routine: the last toggle
-     * leaves a zero in r0 and the delay has already overwritten r1. */
-    return 0;
+     * only writes r0, so the delay's r1 survives - 0 when the key filter was
+     * armed and 7 when it was not. */
+    return (uint16_t)(waited & 0xFF00u);
 }
 
 /* 0x23C94 - `mov r0, 1 / mov r1, 0 / bl delay`, wrapped in `push xr0` so the
@@ -292,6 +302,33 @@ uint16_t blink_countdown(uint8_t *ds, uint16_t ptr)
         ds_put(ds, (uint16_t)(ptr + 5), next);
         return (uint16_t)((ptr & 0xFF00u) | next);
     }
-    (void)display_pulse(ds, 0);
-    return 0;
+    /* The pulse ends with `mov r0, 0` over the delay's r1, so the high half of
+     * the answer depends on whether the key filter was armed. */
+    return (uint16_t)(display_pulse(ds, 0) & 0xFF00u);
+}
+
+/* 0x0E238 - the count-up twin of the blink: while the byte at offset 5 is below
+ * the limit at offset 4 it steps up by one, and at the limit it blinks the panel
+ * and reloads the byte from the limit.
+ *
+ * `add r0, 1` is an eight-bit add, so the count wraps to 0 rather than reaching
+ * the limit.  On the counting path r1 is still the limit byte the compare
+ * loaded; on the blink path it is whatever the pulse's delay left - 0 when the
+ * key filter was armed and 7 when it was not - which is why the two answers
+ * differ in their high halves. */
+uint16_t blink_countup(uint8_t *ds, uint16_t ptr)
+{
+    uint8_t limit = ds[(uint16_t)(ptr + 4)];
+    uint8_t value = ds[(uint16_t)(ptr + 5)];
+    uint16_t pulsed;
+
+    if (value < limit) {
+        uint8_t next = (uint8_t)(value + 1u);
+
+        ds_put(ds, (uint16_t)(ptr + 5), next);
+        return (uint16_t)(((uint16_t)limit << 8) | next);
+    }
+    pulsed = display_pulse(ds, 0);
+    ds_put(ds, (uint16_t)(ptr + 5), limit);
+    return (uint16_t)((pulsed & 0xFF00u) | limit);
 }

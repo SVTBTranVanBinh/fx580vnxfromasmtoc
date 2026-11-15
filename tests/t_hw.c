@@ -217,8 +217,59 @@ static uint16_t a_mode_state_update(uint8_t *ds, const uint16_t *e,
     return mode_state_update(ds, e[0]);
 }
 
+/* 0x2F78C - two or four, with the caller's high half carried through both
+ * answers, so the sweep has to vary the high byte too. */
+static void test_value_is_two_or_four(void)
+{
+    static const uint16_t highs[] = {0x0000, 0x0100, 0xD200, 0xFF00};
+    static const uint8_t lows[] = {0, 1, 2, 3, 4, 5, 0xFE, 0xFF};
+
+    for (size_t h = 0; h < sizeof(highs) / sizeof(highs[0]); h++) {
+        for (size_t l = 0; l < sizeof(lows) / sizeof(lows[0]); l++) {
+            uint16_t arg = (uint16_t)(highs[h] | lows[l]);
+
+            random_image(0x2F78Cu + (uint32_t)(h * 31u + l));
+            Args a = {.er = {arg}, .nstk = 0};
+            uint16_t r = run_rom(0x2F78C, &a, "value_is_two_or_four");
+            begin_c();
+            uint16_t c = value_is_two_or_four(after_c, arg);
+            check_ret("value_is_two_or_four", r, c);
+            check_mem_all("value_is_two_or_four");
+        }
+    }
+}
+
+/* 0x0A546 - bit 6 of 0xD116 or an empty string at 0xD180.  The length's high
+ * byte survives into the answer, so the strings include one long enough to have
+ * a non-zero high half - a 300-byte string is what tells a `mov er0, er0`
+ * sixteen-bit test from a byte test. */
+static void test_flag_or_empty_0D180(void)
+{
+    static const uint8_t bits[] = {0x00, 0x40, 0x80, 0xC0};
+    static const size_t lengths[] = {0, 1, 2, 5, 300};
+
+    for (size_t b = 0; b < sizeof(bits) / sizeof(bits[0]); b++) {
+        for (size_t l = 0; l < sizeof(lengths) / sizeof(lengths[0]); l++) {
+            random_image(0x0A546u + (uint32_t)(b * 13u + l));
+            image[0xD116] = bits[b];
+            for (size_t i = 0; i < lengths[l]; i++)
+                image[(uint16_t)(0xD180 + i)] = (uint8_t)(0x41 + i % 26);
+            image[(uint16_t)(0xD180 + lengths[l])] = 0;
+
+            Args a = {.nstk = 0};
+            uint16_t r = run_rom(0x0A546, &a, "flag_or_empty_0D180");
+            begin_c();
+            uint16_t c = flag_or_empty_0D180(after_c);
+            check_ret("flag_or_empty_0D180", r, c);
+            check_mem_all("flag_or_empty_0D180");
+        }
+    }
+}
+
 void test_hw(void)
 {
+    test_value_is_two_or_four();
+    test_flag_or_empty_0D180();
     test_state_predicates();
     test_d10e_token_tests();
     test_more_mode_predicates();

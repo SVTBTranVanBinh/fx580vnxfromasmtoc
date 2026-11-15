@@ -973,8 +973,27 @@ static void test_high_nibble_into_r5(void)
     }
 }
 
+/* 0x18384 copies thirty bytes between two times-ten records; the indices arrive
+ * in r8 and r9 - the low and high byte of er8 - so both are swept over the
+ * whole byte range and the neighbouring records are checked for damage. */
+static void test_copy_record_30(void)
+{
+    for (unsigned a = 0; a < 256; a += 5) {
+        for (unsigned b = 0; b < 256; b += 7) {
+            random_image(0x18384u + a * 256u + b);
+            Args args = {.er = {(uint16_t)(a | (b << 8))}, .nstk = 0};
+            uint16_t r = run_rom(0x18384, &args, "copy_record_30");
+            begin_c();
+            uint16_t c = copy_record_30(after_c, (uint8_t)a, (uint8_t)b);
+            check_ret("copy_record_30", r, c);
+            check_mem_all("copy_record_30");
+        }
+    }
+}
+
 void test_mem(void)
 {
+    test_copy_record_30();
     test_small_leaves();
     test_record10_moves();
     test_record_status_paths();

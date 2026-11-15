@@ -312,8 +312,37 @@ static void test_blink_countdown(void)
     }
 }
 
+/* 0x0E238 counts the byte at offset 5 up to the limit at offset 4 and blinks
+ * when it is already there; the limit is swept over the whole byte range so the
+ * wrap at 0xFF and the unsigned compare both get exercised. */
+static void test_blink_countup(void)
+{
+    static const uint16_t ptrs[] = {0xD200, 0xD201, 0xD2FD, 0xE000, 0xF800};
+    static const uint8_t limits[] = {0, 1, 2, 0x0A, 0x80, 0xFF};
+
+    for (size_t p = 0; p < sizeof(ptrs) / sizeof(ptrs[0]); p++) {
+        for (size_t li = 0; li < sizeof(limits) / sizeof(limits[0]); li++) {
+            for (unsigned value = 0; value < 256; value += 3) {
+                uint16_t ptr = ptrs[p];
+
+                random_image((uint32_t)(0x0E238u + p * 700u +
+                                        li * 50u + value));
+                image[(uint16_t)(ptr + 4)] = limits[li];
+                image[(uint16_t)(ptr + 5)] = (uint8_t)value;
+                Args a = {.er = {ptr}, .nstk = 0};
+                uint16_t r = run_rom(0x0E238, &a, "blink_countup");
+                begin_c();
+                uint16_t c = blink_countup(after_c, ptr);
+                check_ret("blink_countup", r, c);
+                check_mem_all("blink_countup");
+            }
+        }
+    }
+}
+
 void test_keyboard(void)
 {
+    test_blink_countup();
     test_blink_countdown();
     test_timer_delay();
     test_timer_delay_once();
