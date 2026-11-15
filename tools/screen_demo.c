@@ -19,6 +19,7 @@
 /* The demo draws one frame and two lines of text into buffer 1. */
 #define STR_ADDR 0xD100u
 #define SEL_ADDR 0xD139u
+#define FONT_SIZE_ADDR 0xD137u
 
 static uint8_t ds[0x10000];
 
@@ -38,6 +39,9 @@ int main(void)
     }
     fclose(rom);
     ds[SEL_ADDR] = 1;                        /* nonzero selects buffer 1 */
+    ds[FONT_SIZE_ADDR] = 14;                 /* the firmware only ever sets
+                                              * 10 or 14; anything else makes
+                                              * the ROM read its own stack */
     for (size_t i = 0; i < sizeof line; i++)
         ds[(uint16_t)(STR_ADDR + i)] = (uint8_t)line[i];
 

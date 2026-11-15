@@ -103,8 +103,13 @@ gcc -std=c11 -O2 -o build/screen_demo tools/screen_demo.c src/*.c emu/nx8.c -I s
 ( cd machine && SDL_VIDEODRIVER=dummy emulator/build/emulator \
     model=../build/models/fx580vnx_emu script=../tools/screen_demo.lua \
     | grep -E '^[0-9A-F]{2} ' > ../build/fb_rom.txt )
-cmp build/fb_c.txt build/fb_rom.txt
+cmp build/fb_c.txt build/fb_rom.txt        # identical, 1536 bytes
 ```
+
+Both sides pin `0xD137` (the font size) to 14 first.  Anything other than 10 or
+14 sends the ROM into its own stack frame for the glyph rows past the end of the
+bitmap, which no model of the data space can reproduce; see the last rows of the
+trap table in `docs/progress.md`.
 
 The C side has to load `resource/rom.bin` into `0x0000..0xCFFF` first: below
 `0xD000` the data space *is* the ROM window and the font bitmaps live there, so a

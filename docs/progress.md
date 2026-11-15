@@ -91,6 +91,8 @@ the core manual (`resource/nX-U8100 Core Instruction Manual.txt`) or against
 | `BC AL` | condition nibble 14 really is unconditional; a backward `bc al` is a plain loop jump and the exit test sits at the loop head | §3.3 condition table (1000..1110 = NE, EQ, NV, OV, PS, NS, AL) |
 | `bl` and the stack | `bl` pushes **nothing** - it sets the link registers `lr`/`lcsr` - while `pop pc` pops **four** bytes (pc and csr).  So `push <word> ; push <word> ; bl f_1FFFE` (a callee whose body is a bare `pop pc`) does not return to its caller at all: the two pushed words *become* the new pc and csr and control goes to the address the caller stacked.  `0x2FFC6` is that shape, and it can never be diff-tested | `emu/nx8.c` (`H_PUSHL` covers `push lr` only; `nx8_call` sets `lr`/`lcsr` for `bl`) |
 | a status byte reused as the answer's high half | `mov r1, r0 ; and r1, 240 ; cmp r1, 64` destroys the caller's r1 on the way to the compare, so the routine it ends in answers `(status & 0xF0) << 8` and not `arg & 0xFF00` (`0x1DA62`); its neighbour `0x1D9AC` keeps the caller's high byte on the first two exits and answers the record's own byte on the last - four exits, three different high halves | both routines' diff-tests; the trap is invisible to a pointer sweep, so the status byte is swept over all 256 values |
+| the glyph buffer past the font's own rows | `0x0904C` keeps its glyph bitmap in its **own stack frame**, so with a font size other than 10 or 14 the rows past the extractor's fill are whatever the data space held at that address - filling `0xEC00..0xECFF` with 0xAA makes the ROM draw 0xAA rows.  The C clears the bitmap and reads zero past its end, which is deterministic but cannot match the ROM there: the ROM's answer depends on the stack pointer, not on the data space alone.  Only 10 and 14 are in domain (`0x099E4` and `0x2086C` are the two writers of `0xD137`) and they fill exactly as many rows as `height` asks for, so the divergence is unreachable from the firmware | `tools/screen_demo.lua` (font size 0) versus `tools/screen_demo.c`; the C side now pins the font at 14 |
+| the answer's high half | `0x08FEE` writes only r0, so `line_print`'s `count` comes back in r0 and whatever r1 held at the end in r1: one more than `char_print`'s row count (0x0E for the 14-pixel font, 0x0A for the 10-pixel one, one less for the wide markers 241/242), the arguments untouched when `char_print` was off screen (`x > 191`, or `y >= 64`), the buffer end 0xE3D3/0xE9D3 when the row loop ran off the bottom, and the caller's y when nothing was drawn at all.  The control character 1 inherits the half from its **own** `char_print`, which draws two pixels to the left - so at x = 0 or 1 it is off screen and r1 stays at y | `char_print`, `char_print_1byte`, `line_print` and `line_print.col_0` diff-tests, all four compared as full words since this row was written |
 
 Consequence worth stating once: a block copy must not read and write one byte at
 a time.  The ROM loads ten bytes into `er6`+`qr8`, stores them, and only then
@@ -181,12 +183,11 @@ The arithmetic core is the largest single block and the most intricate: it is
 at `0xD000`/`0xD010` (see `compare_bcd_records` and `decimal_record_predicate`
 in `src/mem.c` for the flavour). Translating it is what will move the
 instruction percentage fastest, because those routines are big.
-| the glyph buffer past the font's own rows | `0x0904C` keeps its glyph bitmap in its **own stack frame**, so with a font size other than 10 or 14 the rows past the extractor's fill are whatever the data space held at that address.  `tools/screen_demo.lua` (font size 0) shows it: the ROM draws 0xAA rows when 0xEC00..0xECFF is filled with 0xAA, while the C reads host stack garbage.  Only 10 and 14 are in domain - `0x099E4` and `0x2086C` are the two writers of 0xD137 - and every test sets one of those two for that reason | `tools/screen_demo.lua` and `tools/screen_demo.c`, `char_print` in `src/print.c` |
 
 ## A note on the 30% target
 
 30% of the instruction total is roughly 9800 instructions; at the
-current 14.8% the project is ~4800 instructions in. Reaching 30% therefore means
+current 15.3% the project is ~5000 instructions in. Reaching 30% therefore means
 translating on the order of 300 more routines, and the ones that are left are
 bigger and more entangled than the ones done so far (the easy leaf
 functions and hardware pokes are largely gone). Work in batches with

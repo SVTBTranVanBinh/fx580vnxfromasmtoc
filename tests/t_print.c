@@ -197,9 +197,10 @@ static void one_print(uint32_t seed, uint16_t xy, uint8_t ch, uint8_t marker,
     image[0xD139] = cur;
 
     Args args = {.er = {xy, (uint16_t)(((uint16_t)marker << 8) | ch)}};
-    run_rom(0x09056, &args, "char_print");
+    uint16_t rom_ret = run_rom(0x09056, &args, "char_print");
     begin_c();
-    char_print(after_c, xy, ch, marker);
+    uint16_t c_ret = char_print(after_c, xy, ch, marker);
+    check_ret("char_print", rom_ret, c_ret);
     check_mem("char_print", 0xDDD4, 0xE9D4);
 }
 
@@ -268,9 +269,11 @@ static void test_char_print_1byte(void)
                     Args args = {
                         .er = {xy, (uint16_t)(((uint16_t)markers[m] << 8) |
                                              ch)}};
-                    run_rom(0x0904C, &args, "char_print_1byte");
+                    uint16_t rom_ret =
+                        run_rom(0x0904C, &args, "char_print_1byte");
                     begin_c();
-                    char_print_1byte(after_c, xy, ch);
+                    uint16_t c_ret = char_print_1byte(after_c, xy, ch);
+                    check_ret("char_print_1byte", rom_ret, c_ret);
                     check_mem("char_print_1byte", 0xDDD4, 0xE9D4);
                 }
             }
@@ -297,13 +300,15 @@ static void one_line(uint32_t seed, uint16_t xy, const uint8_t *chars, size_t n,
     begin_c();
 
     uint16_t str_out = 0;
-    uint8_t count = line_print(after_c, xy, 0xD400, &str_out);
+    uint16_t count = line_print(after_c, xy, 0xD400, &str_out);
 
     checks++;
-    if ((rom_ret & 0xFF) != (uint16_t)count || rom_str != str_out) {
+    if (rom_ret != count || rom_str != str_out) {
         failures++;
-        printf("FAIL %-24s count: rom=%02X c=%02X, str: rom=%04X c=%04X\n",
-               "line_print", rom_ret & 0xFF, count, rom_str, str_out);
+        printf("FAIL %-24s count: rom=%04X c=%04X, str: rom=%04X c=%04X "
+               "(xy=%04X font=%u cur=%u mode=%u flag=%u calc=%u n=%u)\n",
+               "line_print", rom_ret, count, rom_str, str_out, xy, font, cur,
+               mode, flag, calc_mode, (unsigned)n);
     }
     check_mem("line_print", 0xDDD4, 0xE9D4);
 }
@@ -412,11 +417,7 @@ static void test_line_print_col0(void)
                 uint16_t c_ret = line_print_col0(
                     after_c, (uint16_t)((ys[yi] << 8) | xs[xi]), 0xD400,
                     &str_out);
-                /* Only the low half of the answer is modelled: line_print's
-                 * own body leaves an internal byte in r1, which is why the
-                 * 0x08F7E test compares `rom_ret & 0xFF` too. */
-                check_ret("line_print.col_0", (uint16_t)(rom_ret & 0xFF),
-                          (uint16_t)(c_ret & 0xFF));
+                check_ret("line_print.col_0", rom_ret, c_ret);
                 check_ret("line_print.col_0 str", rom_str, str_out);
                 check_mem("line_print.col_0 screen", 0xDDD4, 0xE9D4);
             }

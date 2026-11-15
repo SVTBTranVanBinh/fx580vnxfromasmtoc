@@ -53,10 +53,10 @@ uint16_t lcd_addr(uint8_t *ds, uint16_t xy, uint16_t *out);
  * The font size and draw mode come from 0xD137/0xD138 and the target buffer
  * from 0xD139.  The glyph is drawn MSB-first, 24 bytes per row; the last row
  * is always drawn from the blank source (see BLANK_GLYPH). */
-void char_print(uint8_t *ds, uint16_t xy, uint8_t ch, uint8_t marker);
+uint16_t char_print(uint8_t *ds, uint16_t xy, uint8_t ch, uint8_t marker);
 
 /* 0x0904C - char_print with the marker fixed at 0. */
-void char_print_1byte(uint8_t *ds, uint16_t xy, uint8_t ch);
+uint16_t char_print_1byte(uint8_t *ds, uint16_t xy, uint8_t ch);
 
 /* The ROM keeps the decompressed text in the 64-byte frame it allocates at
  * SP-64; this model takes that buffer as an argument so callers can choose
@@ -79,7 +79,7 @@ uint16_t str_decompress_print(uint8_t *ds, uint16_t str, uint16_t buf,
  * Advances while x stays within the line width; the returned count is the
  * number of printed characters and *str_out receives the pointer the loop
  * stopped at (the terminator when the string ran out). */
-uint8_t line_print(uint8_t *ds, uint16_t xy, uint16_t str, uint16_t *str_out);
+uint16_t line_print(uint8_t *ds, uint16_t xy, uint16_t str, uint16_t *str_out);
 
 /* 0x08F7C - line_print entering with r0 cleared, i.e. at x = 0. */
 uint16_t line_print_col0(uint8_t *ds, uint16_t arg, uint16_t str,

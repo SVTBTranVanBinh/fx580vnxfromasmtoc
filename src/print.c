@@ -10,6 +10,8 @@
 
 #include "../src/runtime.h"
 #include "display.h"
+#include <string.h>
+
 #include "font.h"
 
 #define FONT_SIZE_ADDR   0xD137
@@ -159,7 +161,11 @@ uint16_t screen_blit_masked(uint8_t *ds, uint16_t value_mask, uint16_t addr)
     return screen_blend(ds, addr, (uint8_t)(value & mask), mask);
 }
 
-void char_print(uint8_t *ds, uint16_t xy, uint8_t ch, uint8_t marker)
+/* the bytes a row read past the end of the glyph bitmap answers: the ROM reads
+ * its own stack there, which the model cannot address (see char_print). */
+static const uint8_t zero_row[2] = {0, 0};
+
+uint16_t char_print(uint8_t *ds, uint16_t xy, uint8_t ch, uint8_t marker)
 {
     uint8_t x = (uint8_t)xy;
     uint8_t y = (uint8_t)(xy >> 8);
@@ -167,13 +173,15 @@ void char_print(uint8_t *ds, uint16_t xy, uint8_t ch, uint8_t marker)
     uint8_t glyph[2 * FONT14_ROWS];
     uint8_t width, threshold, height, stride, mid_mask;
     uint8_t bit, mask_a, mask_b, counter;
-    uint16_t screen, end, glyph_pos;
+    uint16_t screen, end, glyph_pos, answer;
     int blank = 0;
 
-    if (x > 191)
-        return;
+    /* both bounds guards answer the arguments untouched - measured, not
+     * guessed: x = 192 with y = 0 comes back as 0x00C0, not as the sizes */
     if ((int8_t)y >= 64)
-        return;
+        return xy;
+    if (x > 191)
+        return xy;
 
     if (marker == 241 || marker == 242) {
         width = 12;
@@ -189,7 +197,20 @@ void char_print(uint8_t *ds, uint16_t xy, uint8_t ch, uint8_t marker)
         height = (uint8_t)(font - 1);
     }
 
+    /* what the ROM's er0 holds when the loop runs to completion: the row count
+     * in r0 and one more than it in r1 */
+    answer = (uint16_t)(((uint16_t)(height + 1) << 8) | height);
+
     end = ds[CURRENT_BUF_ADDR] != 0 ? 0xE3D3u : 0xE9D3u;
+
+    /* 0x0904C keeps this bitmap in its own stack frame, so any row past the one
+     * the extractor fills is not a function of the data space at all: it is
+     * whatever was at that stack address.  Clearing it and reading zero past
+     * the end keeps the model deterministic.  Only fonts 10 and 14 are in
+     * domain - they fill exactly as many rows as `height` asks for - and every
+     * test sets one of them; see the "glyph buffer past the font's own rows"
+     * row in docs/progress.md. */
+    memset(glyph, 0, sizeof glyph);
 
     if (font > 10)
         char_get_14_buf(ds, ch, marker, glyph);
@@ -205,7 +226,10 @@ void char_print(uint8_t *ds, uint16_t xy, uint8_t ch, uint8_t marker)
     glyph_pos = 0;
     counter = 0;
     for (;;) {
-        const uint8_t *row = blank ? ds + BLANK_GLYPH : glyph + glyph_pos;
+        const uint8_t *row = blank ? ds + BLANK_GLYPH
+                          : glyph_pos + stride <= sizeof glyph
+                                ? glyph + glyph_pos
+                                : zero_row;
 
         if (stride == 1) {
             if (bit == 0) {
@@ -242,32 +266,33 @@ void char_print(uint8_t *ds, uint16_t xy, uint8_t ch, uint8_t marker)
 
         screen = (uint16_t)(screen + SCREEN_ROW_BYTES);
         if (screen > end)
-            return;
+            return end;
         glyph_pos = (uint16_t)(glyph_pos + stride);
         counter++;
         if (counter == height)
             blank = 1;
         if (counter > height)
-            return;
+            return answer;
     }
 }
 
 /* 0x0904C - char_print with the marker forced to 0.  The entry is `push lr /
  * push xr4 / push qr8 / mov r3, 0` and then a branch into the body at 0x0905C,
  * which is exactly where char_print's own prologue ends; the only difference
- * between the two entry points is the byte in r3.  char_print has no observable
- * return value (its test compares the screen only), so neither does this. */
-void char_print_1byte(uint8_t *ds, uint16_t xy, uint8_t ch)
+ * between the two entry points is the byte in r3, so the answer is its own. */
+uint16_t char_print_1byte(uint8_t *ds, uint16_t xy, uint8_t ch)
 {
-    char_print(ds, xy, ch, 0);
+    return char_print(ds, xy, ch, 0);
 }
 
 /*
  * 0x08FF6 - control character 1 inside a string.  Draws one cell (in "set
  * pixels" mode) just to the left of the cursor and advances the line by a
- * fixed amount.  Returns the new x coordinate.
+ * fixed amount.  Returns the new x coordinate and, in *high_out, the byte its
+ * own char_print left in r1 - which is what survives into line_print's answer.
  */
-static uint8_t print_control_1(uint8_t *ds, uint16_t xy, uint8_t marker)
+static uint8_t print_control_1(uint8_t *ds, uint16_t xy, uint8_t marker,
+                               uint8_t *high_out)
 {
     uint8_t y = (uint8_t)(xy >> 8);
     uint8_t x = (uint8_t)xy;
@@ -285,13 +310,19 @@ static uint8_t print_control_1(uint8_t *ds, uint16_t xy, uint8_t marker)
     save = ds[DRAW_MODE_ADDR];
     ds[DRAW_MODE_ADDR] = 1;
     offset = (uint8_t)(x - (ds[FONT_SIZE_ADDR] == 14 ? 2 : 1));
-    char_print(ds, (uint16_t)((y << 8) | offset), ch, marker);
+    *high_out = (uint8_t)(char_print(ds, (uint16_t)((y << 8) | offset), ch,
+                                     marker) >> 8);
     ds[DRAW_MODE_ADDR] = save;
 
     return (uint8_t)(x + CONTENT_1_STEP);
 }
 
-uint8_t line_print(uint8_t *ds, uint16_t xy, uint16_t str, uint16_t *str_out)
+/* The high half of line_print's answer is not free: every drawing step leaves
+ * its own char_print's leftover in r1 (one more than the row count it used, or
+ * the arguments untouched when the cell was off screen), and with nothing drawn
+ * at all r1 is still the y coordinate the caller passed in.  `0x08FEE` only
+ * writes r0, so the high half has to be carried explicitly. */
+uint16_t line_print(uint8_t *ds, uint16_t xy, uint16_t str, uint16_t *str_out)
 {
     uint8_t y = (uint8_t)(xy >> 8);
     uint8_t x = (uint8_t)xy;
@@ -299,6 +330,7 @@ uint8_t line_print(uint8_t *ds, uint16_t xy, uint16_t str, uint16_t *str_out)
     uint8_t limit = (uint8_t)(192 - width);
     uint8_t count = 0;
     uint8_t marker = 0;
+    uint8_t high = y;
 
     while (x <= limit) {
         uint8_t c = ds[str];
@@ -310,7 +342,9 @@ uint8_t line_print(uint8_t *ds, uint16_t xy, uint16_t str, uint16_t *str_out)
              * marker of the next character. */
             marker = c;
         } else if (c == 1) {
-            x = print_control_1(ds, (uint16_t)((y << 8) | x), marker);
+            /* the control cell draws at x-2, so at x = 0 or 1 it falls off the
+             * left edge and char_print answers the arguments untouched */
+            x = print_control_1(ds, (uint16_t)((y << 8) | x), marker, &high);
             count++;
             marker = 0;
         } else if (c == 4) {
@@ -318,13 +352,15 @@ uint8_t line_print(uint8_t *ds, uint16_t xy, uint16_t str, uint16_t *str_out)
              * is drawn nine pixels earlier.  Other fonts drop the byte. */
             if (ds[FONT_SIZE_ADDR] == 14) {
                 str++;
-                char_print(ds, (uint16_t)((y << 8) | x), ds[str], marker);
+                high = (uint8_t)(char_print(ds, (uint16_t)((y << 8) | x),
+                                            ds[str], marker) >> 8);
                 x += 9;
                 count++;
                 marker = 0;
             }
         } else {
-            char_print(ds, (uint16_t)((y << 8) | x), c, marker);
+            high = (uint8_t)(char_print(ds, (uint16_t)((y << 8) | x), c,
+                                        marker) >> 8);
             x += (marker == 241 || marker == 242) ? 12 : width;
             count++;
             marker = 0;
@@ -334,7 +370,7 @@ uint8_t line_print(uint8_t *ds, uint16_t xy, uint16_t str, uint16_t *str_out)
 
     if (str_out)
         *str_out = str;
-    return count;
+    return (uint16_t)(((uint16_t)high << 8) | count);
 }
 
 /* 0x099E4 - the start-up screen: fourteen-pixel font, buffer 0, and the fill
@@ -369,8 +405,9 @@ uint16_t line_print_col0(uint8_t *ds, uint16_t arg, uint16_t str,
 {
     uint16_t xy = (uint16_t)(arg & 0xFF00u);
 
-    return (uint16_t)(((uint16_t)arg & 0xFF00u) |
-                      line_print(ds, xy, str, str_out));
+    /* the high half is line_print's own (see draw_high), and with nothing
+     * drawn it is this `arg & 0xFF00` that survives in r1 */
+    return line_print(ds, xy, str, str_out);
 }
 
 uint8_t print_mode_label(uint8_t *ds)
@@ -445,7 +482,7 @@ uint16_t str_decompress_print(uint8_t *ds, uint16_t str, uint16_t buf,
     if (smart_strlen_n(ds, out) > DECOMP_MAX)
         smart_strcpy_nn(ds, out, DECOMP_STATIC);
 
-    count = line_print(ds, 0, out, NULL);
+    count = (uint8_t)line_print(ds, 0, out, NULL);
     if (end_out)
         *end_out = (uint16_t)(str + smart_strlen_n(ds, str));
     return count;

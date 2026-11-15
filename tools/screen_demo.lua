@@ -8,6 +8,7 @@
 local SENT = 0xA1D0
 local STR_ADDR = 0xD100
 local SEL_ADDR = 0xD139
+local FONT_SIZE_ADDR = 0xD137
 local BUF1 = 0xDDD4
 
 -- The same call list as the C demo: frame, second frame, then two text lines.
@@ -38,6 +39,7 @@ emu:post_tick(function()
             data[a] = 0
         end
         data[SEL_ADDR] = 1
+        data[FONT_SIZE_ADDR] = 14
         local s = "HELLO 580VN"
         for i = 1, #s do
             data[STR_ADDR + i - 1] = string.byte(s, i)
