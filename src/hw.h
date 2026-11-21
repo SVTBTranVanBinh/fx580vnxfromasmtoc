@@ -165,4 +165,13 @@ uint16_t display_enable_set(uint8_t *ds, uint16_t arg);
 /* 0x1844E - is the byte at +8 of record 0x18940(argument) above 14? */
 uint16_t record_tail_over_14(uint8_t *ds, uint16_t value);
 
+/* 0x24B10 - bit 4 of the mode byte or the submode predicate says "no setup". */
+uint16_t submode_setup_gate(uint8_t *ds, uint16_t arg);
+
+/* 0x09E4E - clear the 0xD392 state buffer and plant a kind-1 record at 0xD39C. */
+uint16_t init_state_buffers(uint8_t *ds, uint16_t arg);
+
+/* 0x1841E - initialise three consecutive variable records (kinds 0, 0, 1). */
+uint16_t init_three_var_records(uint8_t *ds, uint16_t arg);
+
 #endif

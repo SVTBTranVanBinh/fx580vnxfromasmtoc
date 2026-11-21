@@ -1,4 +1,6 @@
 /* t_hw.c - differential tests for the hardware-register helpers. */
+#include <string.h>
+
 #include "batch.h"
 #include "harness.h"
 
@@ -15,6 +17,9 @@ W0(key_filter_all)
 W0(flags_set_four)
 W0(lcd_timer_poke)
 W0(display_flags_from_modifiers)
+W1(submode_setup_gate)
+W1(init_state_buffers)
+W1(init_three_var_records)
 W0(mode136_screen_state)
 W0(cursor_rows_init)
 W0(row_limit_for_mode)
@@ -298,7 +303,6 @@ static void test_submode_needs_setup(void)
 {
     static const uint8_t modes[] = {0, 1, 6, 7, 9, 10, 0x80, 0x86, 0x89, 0xFF};
     static const uint8_t subs[] = {0, 1, 2, 3, 4, 9, 0xFF};
-    static const uint8_t attrs[] = {0xD112};
     static const uint8_t rows[] = {1, 3, 4, 5, 8};
     static const uint8_t skews[] = {0, 0xFF};
     static const uint16_t highs[] = {0x0000, 0x0100, 0xD700};
@@ -315,7 +319,7 @@ static void test_submode_needs_setup(void)
                         random_image(seed);
                         image[0xD114] = modes[m];
                         image[0xD115] = subs[s];
-                        image[attrs[0]] = rows[r];
+                        image[0xD112] = rows[r];
                         image[0xD14F] = skews[k];
                         Args a = {.er = {highs[h]}, .nstk = 0};
                         uint16_t rom = run_rom(0x20CF2, &a,
@@ -433,6 +437,9 @@ void test_hw(void)
         {"no_op_0CB0E", 0x0CB0E, "w", a_no_op_0CB0E, 0},
         {"display_enable_set", 0x0A146, "w", a_display_enable_set, 0},
         {"record_tail_over_14", 0x1844E, "w", a_record_tail_over_14, 0},
+        {"submode_setup_gate", 0x24B10, "w", a_submode_setup_gate, 0},
+        {"init_state_buffers", 0x09E4E, "w", a_init_state_buffers, 0},
+        {"init_three_var_records", 0x1841E, "w", a_init_three_var_records, 0},
     );
 
     test_pop_pc_return();

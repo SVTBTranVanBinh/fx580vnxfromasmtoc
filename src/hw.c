@@ -731,3 +731,46 @@ uint16_t screen_mode_setup(uint8_t *ds)
     (void)timer_delay_tail(ds);                          /* 0x09F68 */
     return 0;                                            /* never reached */
 }
+
+/* 0x24B10 - bit 4 of the mode byte short-circuits to "no setup".  Otherwise
+ * the per-submode predicate decides: its nonzero answer also means "no setup".
+ * The high half of the answer is threaded through every path: on the short
+ * circuit it is the caller's r1 (only r0 was zeroed), on the other two it is
+ * whatever submode_needs_setup left in r1. */
+uint16_t submode_setup_gate(uint8_t *ds, uint16_t arg)
+{
+    if (ds[RAM_0D114] & 0x10u)
+        return (uint16_t)(arg & 0xFF00u);
+
+    uint16_t s = submode_needs_setup(ds, arg);
+    if ((uint8_t)s != 0)
+        return (uint16_t)(s & 0xFF00u);
+    return (uint16_t)((s & 0xFF00u) | 1u);
+}
+
+/* 0x09E4E - clear an 80-byte state buffer at 0xD392, then plant a kind-1
+ * ten-byte record at 0xD39C.  `push xr0`/`pop xr0` bracket the work, so the
+ * caller's er0..er3 all come back untouched and er0 is the incoming argument. */
+uint16_t init_state_buffers(uint8_t *ds, uint16_t arg)
+{
+    (void)memzero(ds, 0xD392u, 80u);
+    (void)record_init_kind(ds, 0xD39Cu, 1u);
+    return arg;
+}
+
+/* 0x1841E - initialise three consecutive ten-byte variable records: kinds 0,
+ * 0, 1.  r8 holds the incoming argument, stepped by one each round; the
+ * address each record gets is `record_10b_0DA40` (index * 10 + 0xDA40).  The
+ * final `bl f_1D950` leaves its own answer in er0, which is what comes back. */
+uint16_t init_three_var_records(uint8_t *ds, uint16_t arg)
+{
+    uint16_t r8 = arg;
+    uint16_t out = 0;
+
+    for (int i = 0; i < 3; i++) {
+        uint16_t addr = record_10b_0DA40(ds, r8);
+        out = record_init_kind(ds, addr, (uint8_t)(i == 2 ? 1 : 0));
+        r8 = (uint16_t)(r8 + 1u);
+    }
+    return out;
+}
