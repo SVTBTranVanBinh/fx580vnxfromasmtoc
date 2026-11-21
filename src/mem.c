@@ -1515,3 +1515,115 @@ uint16_t copy_record_30(uint8_t *ds, uint8_t src_index, uint8_t dst_index)
     (void)memcpy_nn(ds, dst, src, 30);
     return 0;
 }
+
+/* 0x24658 - arm the four mode/state bytes at 0xD114..0xD117.  Only r0 is
+ * written (twice to 1 and twice to 0), so the caller's r1 survives into the
+ * answer's high half; with the batch runner's clean er1 that half is zero. */
+uint16_t set_mode_state_bytes(uint8_t *ds)
+{
+    ds[0xD114] = 1;
+    ds[0xD115] = 0;
+    ds[0xD116] = 1;
+    ds[0xD117] = 0;
+    return 0;
+}
+
+/* 0x09CB0 - write the constant 0xD400 to the caller's er2 pointer (a two-byte
+ * store, so an odd pointer is rounded down to even) and answer the byte at
+ * 0xD0F6 in the low half, the caller's r1 in the high half. */
+uint16_t store_d400_and_d0f6(uint8_t *ds, uint16_t arg, uint16_t ptr)
+{
+    uint16_t p = (uint16_t)(ptr & 0xFFFEu);
+
+    ds_put(ds, p, 0x00);
+    ds_put(ds, (uint16_t)(p + 1), 0xD4);
+    return (uint16_t)((arg & 0xFF00u) | ds[0xD0F6]);
+}
+
+/* Write a fixed ten-byte record at 0xD010 and answer the final er0 word.  The
+ * ROM writes three/four word groups plus a trailing byte/word from a register
+ * that is never overwritten afterwards, so that word is the return value. */
+static uint16_t write_record_d010(uint8_t *ds, const uint8_t rec[10],
+                                  uint16_t answer)
+{
+    for (int i = 0; i < 10; i++)
+        ds_store(ds, (uint16_t)(0xD010u + i), rec[i]);
+    return answer;
+}
+
+/* 0x19730 - record [00,01, 00,00, 00,00, 00,00, 00,01], answer 0x0100. */
+uint16_t record_d010_pattern_0100(uint8_t *ds)
+{
+    static const uint8_t rec[10] = {0x00, 0x01, 0, 0, 0, 0, 0, 0, 0x00, 0x01};
+    return write_record_d010(ds, rec, 0x0100u);
+}
+
+/* 0x19746 - record [00,01, 11,11,11,11, 11,11, 11,01], answer 0x0100. */
+uint16_t record_d010_pattern_1111(uint8_t *ds)
+{
+    static const uint8_t rec[10] = {0x00, 0x01, 0x11, 0x11, 0x11, 0x11,
+                                    0x11, 0x11, 0x11, 0x01};
+    return write_record_d010(ds, rec, 0x0100u);
+}
+
+/* 0x19760 - record [99,00, 00,00, 00,00, 00,00, 00,09], answer 0x0900. */
+uint16_t record_d010_pattern_9909(uint8_t *ds)
+{
+    static const uint8_t rec[10] = {0x99, 0, 0, 0, 0, 0, 0, 0, 0x00, 0x09};
+    return write_record_d010(ds, rec, 0x0900u);
+}
+
+/* 0x19794 - record [02,01, 00,00, 00,00, 00,00, 80,01], answer 0x0180. */
+uint16_t record_d010_pattern_0280(uint8_t *ds)
+{
+    static const uint8_t rec[10] = {0x02, 0x01, 0, 0, 0, 0, 0, 0, 0x80, 0x01};
+    return write_record_d010(ds, rec, 0x0180u);
+}
+
+/* 0x199B4 - the ten-byte seed record at 0xD000, answer 0x0100. */
+uint16_t record_d000_seed(uint8_t *ds)
+{
+    static const uint8_t rec[10] = {0x00, 0x01, 0x80, 0x89, 0x35,
+                                    0x65, 0x92, 0x15, 0x14, 0x03};
+    for (int i = 0; i < 10; i++)
+        ds_store(ds, (uint16_t)(0xD000u + i), rec[i]);
+    return 0x0100u;
+}
+
+/* Swap the eight-byte tails at a+2 / b+2 and the first words at a / b.  `l er0,
+ * [b]` loads both r0 and r1 from memory, so the answer is the whole word that
+ * was at b before the swap, not the caller's r1 with a patched low byte. */
+static uint16_t swap_record_tails(uint8_t *ds, uint16_t a, uint16_t b)
+{
+    uint8_t ta[8], tb[8];
+
+    for (int i = 0; i < 8; i++)
+        ta[i] = ds[(uint16_t)(a + 2 + i)];
+    for (int i = 0; i < 8; i++)
+        tb[i] = ds[(uint16_t)(b + 2 + i)];
+    for (int i = 0; i < 8; i++)
+        ds_store(ds, (uint16_t)(b + 2 + i), ta[i]);
+    for (int i = 0; i < 8; i++)
+        ds_store(ds, (uint16_t)(a + 2 + i), tb[i]);
+
+    uint16_t wa = ds_load16(ds, a);
+    uint16_t wb = ds_load16(ds, b);
+    ds_store16(ds, a, wb);
+    ds_store16(ds, b, wa);
+    return wb;
+}
+
+/* 0x1B29A / 0x1B2C0 / 0x1B2E6 / 0x1B30C / 0x1B332 / 0x1B358 - the same tail
+ * swap between two of the ten-byte records. */
+uint16_t swap_records_d000_d010(uint8_t *ds)
+{ return swap_record_tails(ds, 0xD000u, 0xD010u); }
+uint16_t swap_records_d000_d030(uint8_t *ds)
+{ return swap_record_tails(ds, 0xD000u, 0xD030u); }
+uint16_t swap_records_d000_d050(uint8_t *ds)
+{ return swap_record_tails(ds, 0xD000u, 0xD050u); }
+uint16_t swap_records_d000_d020(uint8_t *ds)
+{ return swap_record_tails(ds, 0xD000u, 0xD020u); }
+uint16_t swap_records_d030_d010(uint8_t *ds)
+{ return swap_record_tails(ds, 0xD030u, 0xD010u); }
+uint16_t swap_records_d050_d010(uint8_t *ds)
+{ return swap_record_tails(ds, 0xD050u, 0xD010u); }

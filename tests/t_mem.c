@@ -32,6 +32,19 @@ W1(digit_at)
 W2(record_status_flag40_roundtrip)
 W2(record_status_digit_fixup)
 W2(record_pair_digit_merge)
+W0(set_mode_state_bytes)
+W2(store_d400_and_d0f6)
+W0(record_d010_pattern_0100)
+W0(record_d010_pattern_1111)
+W0(record_d010_pattern_9909)
+W0(record_d010_pattern_0280)
+W0(record_d000_seed)
+W0(swap_records_d000_d010)
+W0(swap_records_d000_d030)
+W0(swap_records_d000_d050)
+W0(swap_records_d000_d020)
+W0(swap_records_d030_d010)
+W0(swap_records_d050_d010)
 
 static void test_memcpy(void)
 {
@@ -369,6 +382,19 @@ static void test_small_leaves(void)
         {"clear_160_bytes", 0x143CA, "p", a_clear_160_bytes, 0},
         {"clear_200_bytes", 0x14C18, "p", a_clear_200_bytes, 0},
         {"clear_block_d6b2", 0x15BF8, "", a_clear_block_d6b2, 0},
+        {"set_mode_state_bytes", 0x24658, "", a_set_mode_state_bytes, 0},
+        {"store_d400_and_d0f6", 0x09CB0, "wp", a_store_d400_and_d0f6, 0},
+        {"record_d010_pattern_0100", 0x19730, "", a_record_d010_pattern_0100, 0},
+        {"record_d010_pattern_1111", 0x19746, "", a_record_d010_pattern_1111, 0},
+        {"record_d010_pattern_9909", 0x19760, "", a_record_d010_pattern_9909, 0},
+        {"record_d010_pattern_0280", 0x19794, "", a_record_d010_pattern_0280, 0},
+        {"record_d000_seed", 0x199B4, "", a_record_d000_seed, 0},
+        {"swap_records_d000_d010", 0x1B29A, "", a_swap_records_d000_d010, 0},
+        {"swap_records_d000_d030", 0x1B2C0, "", a_swap_records_d000_d030, 0},
+        {"swap_records_d000_d050", 0x1B2E6, "", a_swap_records_d000_d050, 0},
+        {"swap_records_d000_d020", 0x1B30C, "", a_swap_records_d000_d020, 0},
+        {"swap_records_d030_d010", 0x1B332, "", a_swap_records_d030_d010, 0},
+        {"swap_records_d050_d010", 0x1B358, "", a_swap_records_d050_d010, 0},
     );
 }
 

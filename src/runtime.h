@@ -204,6 +204,21 @@ uint16_t row_count_over_limit(uint8_t *ds, uint8_t add);
 uint16_t init_descriptor_record(uint8_t *ds, uint16_t dst);
 uint16_t mul16(uint8_t *ds, uint16_t x, uint16_t y);
 
+/* leaf record/state helpers */
+uint16_t set_mode_state_bytes(uint8_t *ds);
+uint16_t store_d400_and_d0f6(uint8_t *ds, uint16_t arg, uint16_t ptr);
+uint16_t record_d010_pattern_0100(uint8_t *ds);
+uint16_t record_d010_pattern_1111(uint8_t *ds);
+uint16_t record_d010_pattern_9909(uint8_t *ds);
+uint16_t record_d010_pattern_0280(uint8_t *ds);
+uint16_t record_d000_seed(uint8_t *ds);
+uint16_t swap_records_d000_d010(uint8_t *ds);
+uint16_t swap_records_d000_d030(uint8_t *ds);
+uint16_t swap_records_d000_d050(uint8_t *ds);
+uint16_t swap_records_d000_d020(uint8_t *ds);
+uint16_t swap_records_d030_d010(uint8_t *ds);
+uint16_t swap_records_d050_d010(uint8_t *ds);
+
 /* 0x2406C - how far a byte has to be shifted before its top bit leaves; the
  * count comes back in both halves of er0. */
 uint16_t shift_until_carry(uint8_t *ds, uint16_t arg);
