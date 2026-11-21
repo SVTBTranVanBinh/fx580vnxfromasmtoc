@@ -1627,3 +1627,94 @@ uint16_t swap_records_d030_d010(uint8_t *ds)
 { return swap_record_tails(ds, 0xD030u, 0xD010u); }
 uint16_t swap_records_d050_d010(uint8_t *ds)
 { return swap_record_tails(ds, 0xD050u, 0xD010u); }
+
+/* `subc` followed by `das`, mirroring emu/nx8.c:op_subc + op_das exactly.
+ * `subc` forms ~a + b + C, complements it, and keeps the carry/half-carry of
+ * that addition; `das` subtracts 0x06/0x60 using those flags and then restores
+ * the carry.  bcd_step's subtract form uses a different half-borrow convention
+ * and does not model this pair. */
+static uint8_t subc_das(uint8_t a, uint8_t b, uint8_t carry_in,
+                        uint8_t *carry_out)
+{
+    uint8_t op0 = (uint8_t)~a;
+    uint16_t sum = (uint16_t)(op0 + b + carry_in);
+    int carry8 = sum >> 8;
+    int carry4 = ((op0 & 0x0Fu) + (b & 0x0Fu) + carry_in) >> 4;
+    uint8_t value = (uint8_t)~sum;
+    uint8_t adjust = 0;
+
+    if ((value & 0x0Fu) > 0x09u || carry4)
+        adjust |= 0x06u;
+    if ((value & 0xF0u) > 0x90u || carry8)
+        adjust |= 0x60u;
+    *carry_out = (uint8_t)carry8;
+    return (uint8_t)(value - adjust);
+}
+
+/* `addc` followed by `daa`, mirroring emu/nx8.c:op_addc + op_daa.  bcd_step
+ * omits op_daa's special 0x90-case, which is exactly where the two banks'
+ * additions disagreed by one. */
+static uint8_t addc_daa(uint8_t a, uint8_t b, uint8_t carry_in,
+                        uint8_t *carry_out)
+{
+    uint16_t sum = (uint16_t)(a + b + carry_in);
+    int carry8 = sum >> 8;
+    int carry4 = (((uint16_t)(a & 0x0Fu) + (b & 0x0Fu) + carry_in)) >> 4;
+    uint8_t value = (uint8_t)sum;
+    uint8_t adjust = 0;
+
+    if ((value & 0x0Fu) > 0x09u || carry4)
+        adjust |= 0x06u;
+    if ((value & 0xF0u) > 0x90u || carry8)
+        adjust |= 0x60u;
+    if ((value & 0xF0u) == 0x90u && (value & 0x0Fu) > 0x09u && !carry4)
+        adjust |= 0x60u;
+    /* op_daa ends with `flags_out |= backup & PSW_C`, so a carry produced by
+     * adding the adjust survives into the next byte (and is ORed with the old
+     * one). */
+    uint16_t adjusted = (uint16_t)(value + adjust);
+    *carry_out = (uint8_t)((adjusted >> 8) != 0 || carry8 != 0);
+    return (uint8_t)adjusted;
+}
+
+/* 0x1C5E6 / 0x1C612 - eight-byte BCD add / subtract across the two register
+ * banks.  The `bc al` after the first byte skips a duplicated byte step, so
+ * every pair is just one `addc`/`subc` plus its decimal adjust; the carry from
+ * each byte feeds the next.  The answer is the first two bytes (er0). */
+static uint16_t bcd_bank8(uint8_t *ds, const uint16_t *e, int subtract)
+{
+    uint8_t lhs[8], rhs[8], carry = 0, zero;
+
+    (void)ds;
+    for (int i = 0; i < 4; i++) {
+        lhs[2 * i] = (uint8_t)e[i];
+        lhs[2 * i + 1] = (uint8_t)(e[i] >> 8);
+        rhs[2 * i] = (uint8_t)e[i + 4];
+        rhs[2 * i + 1] = (uint8_t)(e[i + 4] >> 8);
+    }
+    if (subtract) {
+        for (int i = 0; i < 8; i++)
+            lhs[i] = subc_das(lhs[i], rhs[i], carry, &carry);
+    } else {
+        for (int i = 0; i < 8; i++)
+            lhs[i] = addc_daa(lhs[i], rhs[i], carry, &carry);
+    }
+    (void)zero;
+    return (uint16_t)(lhs[0] | ((uint16_t)lhs[1] << 8));
+}
+
+uint16_t bcd_bank_add(uint8_t *ds, uint16_t a, uint16_t b, uint16_t c,
+                      uint16_t d, uint16_t e, uint16_t f, uint16_t g,
+                      uint16_t h)
+{
+    const uint16_t regs[8] = {a, b, c, d, e, f, g, h};
+    return bcd_bank8(ds, regs, 0);
+}
+
+uint16_t bcd_bank_sub(uint8_t *ds, uint16_t a, uint16_t b, uint16_t c,
+                      uint16_t d, uint16_t e, uint16_t f, uint16_t g,
+                      uint16_t h)
+{
+    const uint16_t regs[8] = {a, b, c, d, e, f, g, h};
+    return bcd_bank8(ds, regs, 1);
+}
