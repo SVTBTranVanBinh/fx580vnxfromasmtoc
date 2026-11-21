@@ -1681,9 +1681,20 @@ static uint8_t addc_daa(uint8_t a, uint8_t b, uint8_t carry_in,
  * banks.  The `bc al` after the first byte skips a duplicated byte step, so
  * every pair is just one `addc`/`subc` plus its decimal adjust; the carry from
  * each byte feeds the next.  The answer is the first two bytes (er0). */
+/* The eight-byte BCD step shared by the register-bank and record forms.  The
+ * carry chains from byte to byte; the caller supplies the initial carry (0 at
+ * a fresh call). */
+static void bcd_bank8_array(uint8_t lhs[8], const uint8_t rhs[8], int subtract,
+                            uint8_t carry)
+{
+    for (int i = 0; i < 8; i++)
+        lhs[i] = subtract ? subc_das(lhs[i], rhs[i], carry, &carry)
+                          : addc_daa(lhs[i], rhs[i], carry, &carry);
+}
+
 static uint16_t bcd_bank8(uint8_t *ds, const uint16_t *e, int subtract)
 {
-    uint8_t lhs[8], rhs[8], carry = 0, zero;
+    uint8_t lhs[8], rhs[8];
 
     (void)ds;
     for (int i = 0; i < 4; i++) {
@@ -1692,16 +1703,51 @@ static uint16_t bcd_bank8(uint8_t *ds, const uint16_t *e, int subtract)
         rhs[2 * i] = (uint8_t)e[i + 4];
         rhs[2 * i + 1] = (uint8_t)(e[i + 4] >> 8);
     }
-    if (subtract) {
-        for (int i = 0; i < 8; i++)
-            lhs[i] = subc_das(lhs[i], rhs[i], carry, &carry);
-    } else {
-        for (int i = 0; i < 8; i++)
-            lhs[i] = addc_daa(lhs[i], rhs[i], carry, &carry);
-    }
-    (void)zero;
+    bcd_bank8_array(lhs, rhs, subtract, 0);
     return (uint16_t)(lhs[0] | ((uint16_t)lhs[1] << 8));
 }
+
+/* The record-level BCD add/sub used by 0x1BB74/0x1BB9E/0x1BBC8/0x1BBF2: the
+ * first word's high byte is adjusted on its own (`add r1,r3; daa` or
+ * `sub r1,r3; das`), then the eight-byte tail is added/subtracted in place. */
+static uint16_t record_bcd8(uint8_t *ds, uint16_t a, uint16_t b, int subtract)
+{
+    uint8_t hi = ds[(uint16_t)(a + 1)];
+    uint8_t other = ds[(uint16_t)(b + 1)];
+    uint8_t carry;
+
+    hi = subtract ? subc_das(hi, other, 0, &carry)
+                  : addc_daa(hi, other, 0, &carry);
+    ds_put(ds, (uint16_t)(a + 1), hi);
+
+    uint8_t lhs[8], rhs[8];
+    for (int i = 0; i < 8; i++) {
+        lhs[i] = ds[(uint16_t)(a + 2 + i)];
+        rhs[i] = ds[(uint16_t)(b + 2 + i)];
+    }
+    /* The `l qr0`/`l qr8` loads set Z/S but not C, so the carry left by the
+     * high-byte add/sub feeds the bank's first `addc`/`subc`. */
+    bcd_bank8_array(lhs, rhs, subtract, carry);
+    for (int i = 0; i < 8; i++)
+        ds_put(ds, (uint16_t)(a + 2 + i), lhs[i]);
+    return (uint16_t)(lhs[0] | ((uint16_t)lhs[1] << 8));
+}
+
+/* 0x1BB74 - subtract the 0xD030 record from the 0xD010 record. */
+uint16_t record_sub_d010_d030(uint8_t *ds)
+{ return record_bcd8(ds, 0xD010u, 0xD030u, 1); }
+
+/* 0x1BB9E - subtract the 0xD010 record from the 0xD000 record. */
+uint16_t record_sub_d000_d010(uint8_t *ds)
+{ return record_bcd8(ds, 0xD000u, 0xD010u, 1); }
+
+/* 0x1BBC8 - add the 0xD030 record into the 0xD010 record. */
+uint16_t record_add_d010_d030(uint8_t *ds)
+{ return record_bcd8(ds, 0xD010u, 0xD030u, 0); }
+
+/* 0x1BBF2 - add the 0xD010 record into the 0xD000 record. */
+uint16_t record_add_d000_d010(uint8_t *ds)
+{ return record_bcd8(ds, 0xD000u, 0xD010u, 0); }
 
 uint16_t bcd_bank_add(uint8_t *ds, uint16_t a, uint16_t b, uint16_t c,
                       uint16_t d, uint16_t e, uint16_t f, uint16_t g,

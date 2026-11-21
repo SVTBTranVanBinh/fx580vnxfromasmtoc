@@ -224,6 +224,10 @@ uint16_t bcd_bank_add(uint8_t *ds, uint16_t a, uint16_t b, uint16_t c,
 uint16_t bcd_bank_sub(uint8_t *ds, uint16_t a, uint16_t b, uint16_t c,
                       uint16_t d, uint16_t e, uint16_t f, uint16_t g,
                       uint16_t h);
+uint16_t record_sub_d010_d030(uint8_t *ds);
+uint16_t record_sub_d000_d010(uint8_t *ds);
+uint16_t record_add_d010_d030(uint8_t *ds);
+uint16_t record_add_d000_d010(uint8_t *ds);
 
 /* 0x2406C - how far a byte has to be shifted before its top bit leaves; the
  * count comes back in both halves of er0. */

@@ -47,6 +47,10 @@ W0(swap_records_d030_d010)
 W0(swap_records_d050_d010)
 W8(bcd_bank_add)
 W8(bcd_bank_sub)
+W0(record_sub_d010_d030)
+W0(record_sub_d000_d010)
+W0(record_add_d010_d030)
+W0(record_add_d000_d010)
 
 static void test_memcpy(void)
 {
@@ -399,6 +403,10 @@ static void test_small_leaves(void)
         {"swap_records_d050_d010", 0x1B358, "", a_swap_records_d050_d010, 0},
         {"bcd_bank_add", 0x1C5E6, "wwwwwwww", a_bcd_bank_add, 0},
         {"bcd_bank_sub", 0x1C612, "wwwwwwww", a_bcd_bank_sub, 0},
+        {"record_sub_d010_d030", 0x1BB74, "", a_record_sub_d010_d030, 0},
+        {"record_sub_d000_d010", 0x1BB9E, "", a_record_sub_d000_d010, 0},
+        {"record_add_d010_d030", 0x1BBC8, "", a_record_add_d010_d030, 0},
+        {"record_add_d000_d010", 0x1BBF2, "", a_record_add_d000_d010, 0},
     );
 }
 
