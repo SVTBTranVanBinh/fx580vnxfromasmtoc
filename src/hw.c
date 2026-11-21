@@ -958,3 +958,69 @@ uint16_t triangular_from_arg(uint8_t *ds, uint16_t arg)
     }
 }
 
+/* 0x2D59A / 0x25352 - small code sets, each ending in a `mov r0,1/0` whose
+ * high half is the caller's untouched r1. */
+uint16_t code_set_2d59a(uint8_t *ds, uint16_t arg)
+{
+    uint8_t v = (uint8_t)arg;
+    uint8_t hit = (v == 8u || v == 3u || v == 10u || v == 2u ||
+                   v == 4u || v >= 12u);
+
+    (void)ds;
+    return (uint16_t)((arg & 0xFF00u) | hit);
+}
+
+uint16_t code_set_25352(uint8_t *ds, uint16_t arg)
+{
+    uint8_t v = (uint8_t)arg;
+    uint8_t hit = (v == 3u || v == 4u || v == 9u || v == 11u || v == 12u);
+
+    (void)ds;
+    return (uint16_t)((arg & 0xFF00u) | hit);
+}
+
+/* 0x20E4A - the mode byte selects one of two fixed 16-bit tokens, or 0. */
+uint16_t mode_token_20e4a(uint8_t *ds)
+{
+    uint8_t mode = ds[MEM_MODE];
+
+    if (mode == 136u)
+        return 0xD784u;
+    if (mode & 0x80u)
+        return 0xD522u;
+    if (mode & 0x40u)
+        return 0xD784u;
+    return 0;
+}
+
+/* 0x29980 - a conjunction of four state bytes: mode 12, state 5, bit 4 of the
+ * mode byte and 0xD136 >= 2.  r1 is never written, so with the clean er1 of a
+ * no-argument batch case the answer is a plain 0 or 1. */
+uint16_t all_state_conditions(uint8_t *ds)
+{
+    if (ds[MEM_MODE] != 12u || ds[0xD116] != 5u)
+        return 0;
+    if ((ds[RAM_0D114] & 0x10u) == 0 || ds[0xD136] < 2u)
+        return 0;
+    return 1;
+}
+
+/* 0x09ADA - the argument is zero, has a non-0xFC high half, is exactly 0xFC42,
+ * or has a low byte in 78..95; all other words answer 0. */
+uint16_t token_window_09ada(uint8_t *ds, uint16_t arg)
+{
+    (void)ds;
+    uint8_t hit;
+
+    if (arg == 0u)
+        hit = 0;
+    else if ((uint8_t)(arg >> 8) != 0xFCu)
+        hit = 1;
+    else if (arg == 0xFC42u)
+        hit = 1;
+    else
+        hit = ((uint8_t)arg >= 78u && (uint8_t)arg <= 95u);
+
+    return (uint16_t)((arg & 0xFF00u) | hit);
+}
+

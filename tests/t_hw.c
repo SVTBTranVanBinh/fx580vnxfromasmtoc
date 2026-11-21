@@ -37,6 +37,11 @@ W0(display_arm_sequence)
 W1(digit_byte_at_pointer)
 W3(table_lookup_d0f8)
 W1(triangular_from_arg)
+W1(code_set_2d59a)
+W1(code_set_25352)
+W0(mode_token_20e4a)
+W0(all_state_conditions)
+W1(token_window_09ada)
 W0(mode136_screen_state)
 W0(cursor_rows_init)
 W0(row_limit_for_mode)
@@ -474,6 +479,11 @@ void test_hw(void)
         {"digit_byte_at_pointer", 0x1F41E, "p", a_digit_byte_at_pointer, 0},
         {"table_lookup_d0f8", 0x13B5A, "zzw", a_table_lookup_d0f8, 0},
         {"triangular_from_arg", 0x0D80C, "w", a_triangular_from_arg, 0},
+        {"code_set_2d59a", 0x2D59A, "w", a_code_set_2d59a, 0},
+        {"code_set_25352", 0x25352, "w", a_code_set_25352, 0},
+        {"mode_token_20e4a", 0x20E4A, "", a_mode_token_20e4a, 0},
+        {"all_state_conditions", 0x29980, "", a_all_state_conditions, 0},
+        {"token_window_09ada", 0x09ADA, "w", a_token_window_09ada, 0},
     );
 
     test_pop_pc_return();

@@ -192,5 +192,10 @@ uint16_t display_arm_sequence(uint8_t *ds);
 uint16_t digit_byte_at_pointer(uint8_t *ds, uint16_t ptr);
 uint16_t table_lookup_d0f8(uint8_t *ds, uint16_t a, uint16_t b, uint16_t c);
 uint16_t triangular_from_arg(uint8_t *ds, uint16_t arg);
+uint16_t code_set_2d59a(uint8_t *ds, uint16_t arg);
+uint16_t code_set_25352(uint8_t *ds, uint16_t arg);
+uint16_t mode_token_20e4a(uint8_t *ds);
+uint16_t all_state_conditions(uint8_t *ds);
+uint16_t token_window_09ada(uint8_t *ds, uint16_t arg);
 
 #endif
