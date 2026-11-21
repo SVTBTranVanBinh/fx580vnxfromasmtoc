@@ -220,5 +220,7 @@ uint16_t copy_record_er6_to_er10(uint8_t *ds, uint16_t a, uint16_t b,
                                  uint16_t er10);
 uint16_t init_record_kind_1d986(uint8_t *ds, uint16_t dst, uint16_t kind);
 uint16_t copy_record_by_bytes(uint8_t *ds, uint16_t arg);
+uint16_t init_record_2244a(uint8_t *ds, uint16_t arg);
+uint16_t copy_table_to_d010(uint8_t *ds, uint16_t unused, uint16_t kind);
 
 #endif

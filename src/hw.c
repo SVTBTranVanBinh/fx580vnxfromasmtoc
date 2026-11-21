@@ -1213,6 +1213,41 @@ uint16_t copy_record_by_bytes(uint8_t *ds, uint16_t arg)
     return first;
 }
 
+/* 0x2244A - initialise a record at 0xD784 with the argument's low byte as its
+ * kind, then answer that byte with a clean high half (r12 is saved, r1 zeroed). */
+uint16_t init_record_2244a(uint8_t *ds, uint16_t arg)
+{
+    (void)init_record_kind_1d986(ds, 0xD784u, (uint8_t)arg);
+    return (uint16_t)(arg & 0xFFu);
+}
+
+/* 0x1BC7C - copy a ten-byte table record into 0xD010.  Kind 31 reads the
+ * special record at 0x1D2E; every other kind reads the 0x1C70 table (clamped to
+ * entry 18).  The final `l r0,[0xD010]` is a byte load, so r1 still holds the
+ * second byte of the *source* record and the answer is that byte above the old
+ * 0xD010 byte. */
+uint16_t copy_table_to_d010(uint8_t *ds, uint16_t unused, uint16_t kind)
+{
+    uint16_t src;
+    uint8_t k = (uint8_t)kind;
+
+    (void)unused;
+    if (k == 31u)
+        src = 0x1D2Eu;
+    else
+        src = (uint16_t)(0x1C70u + (uint16_t)(k >= 19u ? 18u : k) * 10u);
+
+    /* `l r0,[0xD010]` runs after the table load, so byte 0 of the stored
+     * record is the old 0xD010 byte and the rest come from src+1 onward. */
+    uint8_t old = ds[0xD010];
+    uint16_t answer = (uint16_t)(((uint16_t)ds[(uint16_t)(src + 1)] << 8) | old);
+
+    ds_put(ds, 0xD010u, old);
+    for (int i = 1; i < 10; i++)
+        ds_put(ds, (uint16_t)(0xD010u + i), ds[(uint16_t)(src + i)]);
+    return answer;
+}
+
 /* 0x09CC4 - a row count from the mode/submode and one extra state byte.  The
  * last `l r1,[0xD121]` sets Z from the byte it loads, so a zero byte skips the
  * final increment.  Only r0 is written, so with a clean er1 the answer is the
