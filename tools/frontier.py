@@ -1,6 +1,9 @@
 """Bottom-up decompilation frontier.
 
-Usage: python3 tools/frontier.py [-n N] [-a] [-b]
+Usage: python3 tools/frontier.py [-n N] [-a] [-b] [-e]
+
+  -e/--easy  sort the ready list easiest-first (fewest dependencies, then
+             fewest instructions) instead of the default most-complex-first.
 
 Lists ROM functions whose *dependencies* are all already implemented in C.  Those
 are the routines that can be translated next: their C version can be diff-tested
@@ -39,6 +42,9 @@ def main():
                         help="include one-instruction stubs")
     parser.add_argument("-b", "--blocked", action="store_true",
                         help="list the routines that are blocked, and by what")
+    parser.add_argument("-e", "--easy", action="store_true",
+                        help="sort ready routines easiest-first (fewest deps, "
+                             "then fewest instructions)")
     args = parser.parse_args()
 
     db = romdb.load_db()
@@ -80,7 +86,10 @@ def main():
                 owner, count, hits, labels.get(owner, "")))
         return
 
-    ready.sort(key=lambda r: (-r[2], -r[0]))
+    if args.easy:
+        ready.sort(key=lambda r: (r[2], r[0]))
+    else:
+        ready.sort(key=lambda r: (-r[2], -r[0]))
     skipped = len(romdb.TRAMPOLINE_ENTRIES & set(bodies) - done)
     print("%d routines are ready to translate" % len(ready))
     if skipped:
