@@ -135,7 +135,11 @@ loops model it; the decimal-adjust instructions live in other regions.
    they build is modelled by the calling convention itself, and `tools/romdb.py`
    lists them in `STRUCTURAL_ENTRIES`.
 2. `python3 tools/fdump.py 0xNNNNN` prints the annotated body; every branch
-   target, call and data label is resolved.
+   target, call and data label is resolved.  It stops at the first `rt`/`pop
+   pc`, which is not always the end of the function: a branch can jump forward
+   into a later block of the same span (0x0C784's first listing ended at
+   0x0C7A2 and hid a second threshold at 0x0C7A4).  Dump any branch target
+   beyond the printed body before writing the C translation.
 3. The C body goes into the module for its subsystem, with the ROM address in
    the comment and a note for every place where the original is surprising
    (8-bit wrap-around, flags left in `er0`, bytes burned down on the stack...).
