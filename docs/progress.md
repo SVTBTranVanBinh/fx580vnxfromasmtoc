@@ -52,8 +52,8 @@ on the same partition:
 
 | metric | current |
 | --- | --- |
-| routines | 255 / 761 (33.5%) |
-| instructions | 5373 / 32749 (16.4%) |
+| routines | 309 / 761 (40.6%) |
+| instructions | 6075 / 32749 (18.6%) |
 
 (Measured with `python3 tools/coverage.py`; the instruction total counts the
 ret/rt-delimited bodies the tooling treats as one routine each, not every word
@@ -99,6 +99,11 @@ the core manual (`resource/nX-U8100 Core Instruction Manual.txt`) or against
 | a stacked argument that is a **pointer**, not a value | `0x09846` shares its rectangle fill with the constant-pattern pair `0x09826`/`0x09834`, but its stacked word is an address: the body reads `l r0, [er8]` **inside** the per-byte loop and steps er8 by one after each written column byte, so the fill consumes a byte stream rather than repeating a pattern.  A null pointer takes the stub at `0x09854` and draws nothing at all - not a clear, which is what `0x09826` is for.  Reading the stacked word as the pattern matches the pair that pass a constant value and diverges from the very first byte of a dotted fill (the firmware's own call from `0x09EE8` reads the ROM table at `0x646E`) | `0x09846` diff-test, swept over five geometries x two buffers x pointers into RAM, into ROM and null |
 | a routine that never returns | `0x09EE8` ends in `b _start` (`0x0A1CE`), so the harness cannot wait for a `rt`: `run_rom_until(addr, args, name, stop)` steps the core until pc/csr reach the stop address and copies the image *there*, which is what a body that hands control to the main loop has to be compared against.  Its callees also read stack slots they never wrote - the `2[sp]` fallback inside `0x09846` and the holes the frames leave - so a stack full of random bytes sends the ROM through a `pop pc` that was never pushed (the line reads `code fetch from unmapped segment` at an address that is really data): pin `0xEC00..0xEFFF` to zero, exactly as at boot, and keep the rest of the data space random.  A routine whose *own* exit is `pop pc` (the `0x09F68` tail) needs the opposite: `{NX8_SENTINEL, 0}` in the stacked words, because `pop pc` pops four bytes | `0x09EE8` (eight random data spaces, plus the `0xD0F5` guard through the plain runner) and `0x09F68` (`bc ne`/`bc eq` on `0xF042`, four filter bytes) |
 | the answer's high half | `0x08FEE` writes only r0, so `line_print`'s `count` comes back in r0 and whatever r1 held at the end in r1: one more than `char_print`'s row count (0x0E for the 14-pixel font, 0x0A for the 10-pixel one, one less for the wide markers 241/242), the arguments untouched when `char_print` was off screen (`x > 191`, or `y >= 64`), the buffer end 0xE3D3/0xE9D3 when the row loop ran off the bottom, and the caller's y when nothing was drawn at all.  The control character 1 inherits the half from its **own** `char_print`, which draws two pixels to the left - so at x = 0 or 1 it is off screen and r1 stays at y | `char_print`, `char_print_1byte`, `line_print` and `line_print.col_0` diff-tests, all four compared as full words since this row was written |
+
+| `mov r1, 252` before a byte answer | the *whole* high half of er0 becomes 0xFC, not the caller's r1: 0x1FFE6 and 0x2B986 answer `0xFC00 | hit` even when the argument's high byte is random | both routines' diff-tests, swept over all 0xFCxx boundary words |
+| a byte load into r1 becomes the answer's high half | `l r1,[ptr]` writes r1, so a later `mov r0,1/0` leaves the loaded byte upstairs: 0x15E36 answers `(ds[ptr] << 8) | hit`, 0x09CC4 answers `(ds[0xD121] << 8) | r0` on its general path | both diff-tests |
+| `l r0, 3:[er14]` at 0x10E56 | the disassembler's addressing-mode reading is misleading: the routine answers the literal 3 in the low half for every data space, including one with RAM and framebuffer pre-filled with distinct markers | `table_byte_ffdf` diff-test, shape `"w"` |
+| a byte write that destroys the argument's high half | at 0x0D80C `mov r1,0` runs *before* `mov er6,er0`, so the loop bound is `arg & 0xFF` zero-extended, not the whole word; the loop always stops within six iterations | `triangular_from_arg` diff-test over all boundary words, plus a step trace of 0x0D80C |
 
 Consequence worth stating once: a block copy must not read and write one byte at
 a time.  The ROM loads ten bytes into `er6`+`qr8`, stores them, and only then

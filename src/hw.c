@@ -940,9 +940,9 @@ uint16_t table_lookup_d0f8(uint8_t *ds, uint16_t a, uint16_t b, uint16_t c)
 
 /* 0x0D80C - walk er0 up 1, 4, 13, 40, 121, 364, ... (er4 = previous er0,
  * er0 = 3*er4, plus one while er4 < er6) and stop once er4 reaches the
- * argument's *low byte* zero-extended.  `mov er6, er0` here is a byte move, so
- * the argument's high byte is ignored; `mov r0, r4` writes only the low half of
- * the answer and the high half is the high byte of the final er0. */
+ * argument's *low byte* zero-extended: `mov r1,0` at 0x0D80E clears the high
+ * half of er0 before `mov er6,er0` copies it.  `mov r0,r4` writes only the low
+ * half of the answer and the high half is the high byte of the final er0. */
 uint16_t triangular_from_arg(uint8_t *ds, uint16_t arg)
 {
     (void)ds;

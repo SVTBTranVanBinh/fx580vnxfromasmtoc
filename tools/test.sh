@@ -73,10 +73,13 @@ fi
 echo "== CasioEmu cross-check =="
 if [ ! -x machine/emulator/build/emulator ]; then
     echo "cross-check: UNAVAILABLE - machine/emulator/build/emulator is missing" >&2
-    if [ -e machine/.git ] || git -C . ls-files -s machine 2>/dev/null | grep -q '^160000'; then
-        echo "  machine/ is a submodule that is not checked out (and .gitmodules has" >&2
-        echo "  no mapping for it, so 'git submodule update --init machine' cannot" >&2
-        echo "  find a URL - restore the mapping first)." >&2
+    if [ ! -e machine/.git ] && git -C . ls-files -s machine 2>/dev/null | grep -q '^160000'; then
+        echo "  machine/ is a submodule that is not checked out; run" >&2
+        echo "  'git submodule update --init machine' first." >&2
+    else
+        echo "  machine/ is checked out but the reference emulator has not been" >&2
+        echo "  built. It needs meson, ninja, Lua 5.3, SDL2/SDL2_image and readline:" >&2
+        echo "    cd machine/emulator && meson setup build && ninja -C build" >&2
     fi
     echo "  Without the reference emulator there is no independent oracle for" >&2
     echo "  emu/nx8.c, which every differential test compares against." >&2
