@@ -104,6 +104,7 @@ the core manual (`resource/nX-U8100 Core Instruction Manual.txt`) or against
 | a byte load into r1 becomes the answer's high half | `l r1,[ptr]` writes r1, so a later `mov r0,1/0` leaves the loaded byte upstairs: 0x15E36 answers `(ds[ptr] << 8) | hit`, 0x09CC4 answers `(ds[0xD121] << 8) | r0` on its general path | both diff-tests |
 | `l r0, 3:[er14]` at 0x10E56 | the disassembler's addressing-mode reading is misleading: the routine answers the literal 3 in the low half for every data space, including one with RAM and framebuffer pre-filled with distinct markers | `table_byte_ffdf` diff-test, shape `"w"` |
 | a byte write that destroys the argument's high half | at 0x0D80C `mov r1,0` runs *before* `mov er6,er0`, so the loop bound is `arg & 0xFF` zero-extended, not the whole word; the loop always stops within six iterations | `triangular_from_arg` diff-test over all boundary words, plus a step trace of 0x0D80C |
+| `DAA`'s extra 0x90 case and carry | `op_daa` adjusts by 0x60 when the high nibble is exactly 9 and the low nibble > 9 even with no half-carry, and ends with `flags_out |= backup & PSW_C`, so a carry from the adjust (or the original `ADDC`) feeds the next byte.  `DAS` preserves its carry the same way.  The generic `bcd_step` models neither, so 0x1C5E6/0x1C612 use dedicated `addc_daa`/`subc_das` steps copied from the core | both bank add/sub diff-tests, 8-word cross product |
 
 Consequence worth stating once: a block copy must not read and write one byte at
 a time.  The ROM loads ten bytes into `er6`+`qr8`, stores them, and only then
