@@ -1179,6 +1179,40 @@ uint16_t copy_record_er6_to_er10(uint8_t *ds, uint16_t a, uint16_t b,
     return record10_er8_from_er4(ds, er6, er10);
 }
 
+/* 0x1D986 - initialise a ten-byte record at er0.  A kind of 0 or >= 16 becomes
+ * 243; otherwise its high nibble is forced to 0xF.  The rest of the record is
+ * zero.  `mov r0,0` leaves the caller's r1 as the answer's high half. */
+uint16_t init_record_kind_1d986(uint8_t *ds, uint16_t dst, uint16_t kind)
+{
+    uint8_t k = (uint8_t)kind;
+    uint16_t d = (uint16_t)(dst & 0xFFFEu);
+
+    if (k == 0u || k >= 16u)
+        k = 243u;
+    else
+        k = (uint8_t)(k | 0xF0u);
+
+    ds_put(ds, d, k);
+    ds_put(ds, (uint16_t)(d + 1), 0);
+    for (int i = 2; i < 10; i++)
+        ds_put(ds, (uint16_t)(d + i), 0);
+    return (uint16_t)(dst & 0xFF00u);
+}
+
+/* 0x17F32 - copy a ten-byte record between two 0xDA40-table entries selected
+ * by the low and high bytes of er0.  `l qr0,[ea+]` loads the source's first
+ * eight bytes into er0..er6, so er0 answers with the source's first word, read
+ * before any store (which matters when the two entries overlap). */
+uint16_t copy_record_by_bytes(uint8_t *ds, uint16_t arg)
+{
+    uint16_t src = record_10b_0DA40(ds, (uint8_t)arg);
+    uint16_t dst = record_10b_0DA40(ds, (uint8_t)(arg >> 8));
+    uint16_t first = (uint16_t)(ds[src] | ((uint16_t)ds[(uint16_t)(src + 1)] << 8));
+
+    (void)record10_er8_from_er4(ds, src, dst);
+    return first;
+}
+
 /* 0x09CC4 - a row count from the mode/submode and one extra state byte.  The
  * last `l r1,[0xD121]` sets Z from the byte it loads, so a zero byte skips the
  * final increment.  Only r0 is written, so with a clean er1 the answer is the

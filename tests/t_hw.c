@@ -56,6 +56,8 @@ W0(row_count_09cc4)
 W8(or_all_registers)
 W5(token_if_er8_nonzero)
 W6(copy_record_er6_to_er10)
+W2(init_record_kind_1d986)
+W1(copy_record_by_bytes)
 W0(mode136_screen_state)
 W0(cursor_rows_init)
 W0(row_limit_for_mode)
@@ -512,6 +514,8 @@ void test_hw(void)
         {"or_all_registers", 0x1A5C0, "wwwwwwww", a_or_all_registers, 0},
         {"token_if_er8_nonzero", 0x13B6E, "wzzzw", a_token_if_er8_nonzero, 0},
         {"copy_record_er6_to_er10", 0x14450, "zzzwzw", a_copy_record_er6_to_er10, 0},
+        {"init_record_kind_1d986", 0x1D986, "pw", a_init_record_kind_1d986, 0},
+        {"copy_record_by_bytes", 0x17F32, "w", a_copy_record_by_bytes, 0},
     );
 
     test_pop_pc_return();

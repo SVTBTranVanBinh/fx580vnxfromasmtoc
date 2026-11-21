@@ -218,5 +218,7 @@ uint16_t token_if_er8_nonzero(uint8_t *ds, uint16_t arg0, uint16_t z1,
 uint16_t copy_record_er6_to_er10(uint8_t *ds, uint16_t a, uint16_t b,
                                  uint16_t c, uint16_t er6, uint16_t e,
                                  uint16_t er10);
+uint16_t init_record_kind_1d986(uint8_t *ds, uint16_t dst, uint16_t kind);
+uint16_t copy_record_by_bytes(uint8_t *ds, uint16_t arg);
 
 #endif
