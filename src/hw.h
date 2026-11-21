@@ -197,5 +197,11 @@ uint16_t code_set_25352(uint8_t *ds, uint16_t arg);
 uint16_t mode_token_20e4a(uint8_t *ds);
 uint16_t all_state_conditions(uint8_t *ds);
 uint16_t token_window_09ada(uint8_t *ds, uint16_t arg);
+uint16_t store_word_at_d060(uint8_t *ds, uint16_t a, uint16_t b, uint16_t c,
+                            uint16_t d, uint16_t e, uint16_t er10);
+uint16_t value_64_or_66_73(uint8_t *ds, uint16_t ptr);
+uint16_t ranges_16c8e(uint8_t *ds, uint16_t arg);
+uint16_t state_d019_ge_10(uint8_t *ds, uint16_t arg);
+uint16_t abs_diff_d00e(uint8_t *ds, uint16_t arg);
 
 #endif

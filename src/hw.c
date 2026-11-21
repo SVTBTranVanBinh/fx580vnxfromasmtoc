@@ -1024,3 +1024,58 @@ uint16_t token_window_09ada(uint8_t *ds, uint16_t arg)
     return (uint16_t)((arg & 0xFF00u) | hit);
 }
 
+/* 0x16D80 - if er10 < 24, store the incoming er0 at 0xD060 + er10*2 (a
+ * two-byte store, so the address carries through r9); otherwise just park 7 in
+ * r2.  er0 itself is never written, so it is the answer. */
+uint16_t store_word_at_d060(uint8_t *ds, uint16_t a, uint16_t b, uint16_t c,
+                            uint16_t d, uint16_t e, uint16_t er10)
+{
+    (void)a; (void)b; (void)c; (void)d; (void)e;
+
+    if ((uint8_t)er10 < 24u) {
+        uint16_t off = (uint16_t)(((uint8_t)er10) * 2u);
+        uint16_t addr = (uint16_t)(0xD060u + off);
+
+        ds_put(ds, addr, (uint8_t)a);
+        ds_put(ds, (uint16_t)(addr + 1), (uint8_t)(a >> 8));
+    }
+    return a;
+}
+
+/* 0x1E604 - the byte at the pointer is 64 or 66..73. */
+uint16_t value_64_or_66_73(uint8_t *ds, uint16_t ptr)
+{
+    uint8_t v = ds[ptr];
+    return (v == 64u || (v >= 66u && v <= 73u)) ? 1u : 0u;
+}
+
+/* 0x16C8E - with a clear high byte, the low byte in three ranges answers 1. */
+uint16_t ranges_16c8e(uint8_t *ds, uint16_t arg)
+{
+    uint8_t v = (uint8_t)arg;
+
+    (void)ds;
+    /* `cmp r1,0 ; bc ne` jumps to the zero path, but `mov r0,0` leaves r1
+     * alone, so a nonzero high half survives into the answer on that path. */
+    if ((uint8_t)(arg >> 8) != 0u)
+        return (uint16_t)(arg & 0xFF00u);
+    return (uint16_t)((v >= 125u && v <= 130u) || (v >= 135u && v <= 142u) ||
+                      (v >= 147u && v <= 148u));
+}
+
+/* 0x1B698 - the unconditional `bc al` skips the first load, so this is just
+ * the 0xD019 byte tested against 10. */
+uint16_t state_d019_ge_10(uint8_t *ds, uint16_t arg)
+{
+    return (uint16_t)((arg & 0xFF00u) | (ds[0xD019] >= 10u));
+}
+
+/* 0x0C1D0 - the absolute difference (as an unsigned word) between er0 and the
+ * word at 0xD00E. */
+uint16_t abs_diff_d00e(uint8_t *ds, uint16_t arg)
+{
+    uint16_t w = (uint16_t)(ds[0xD00E] | ((uint16_t)ds[0xD00F] << 8));
+
+    return arg < w ? (uint16_t)(w - arg) : (uint16_t)(arg - w);
+}
+

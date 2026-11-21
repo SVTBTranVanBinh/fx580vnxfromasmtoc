@@ -42,6 +42,11 @@ W1(code_set_25352)
 W0(mode_token_20e4a)
 W0(all_state_conditions)
 W1(token_window_09ada)
+W6(store_word_at_d060)
+W1(value_64_or_66_73)
+W1(ranges_16c8e)
+W1(state_d019_ge_10)
+W1(abs_diff_d00e)
 W0(mode136_screen_state)
 W0(cursor_rows_init)
 W0(row_limit_for_mode)
@@ -484,6 +489,11 @@ void test_hw(void)
         {"mode_token_20e4a", 0x20E4A, "", a_mode_token_20e4a, 0},
         {"all_state_conditions", 0x29980, "", a_all_state_conditions, 0},
         {"token_window_09ada", 0x09ADA, "w", a_token_window_09ada, 0},
+        {"store_word_at_d060", 0x16D80, "zzzzzw", a_store_word_at_d060, 0},
+        {"value_64_or_66_73", 0x1E604, "p", a_value_64_or_66_73, 0},
+        {"ranges_16c8e", 0x16C8E, "w", a_ranges_16c8e, 0},
+        {"state_d019_ge_10", 0x1B698, "w", a_state_d019_ge_10, 0},
+        {"abs_diff_d00e", 0x0C1D0, "w", a_abs_diff_d00e, 0},
     );
 
     test_pop_pc_return();

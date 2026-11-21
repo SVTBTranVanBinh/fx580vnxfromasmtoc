@@ -76,6 +76,21 @@ void run_batch(const BatchCase *cases, int count);
         (void)s;                                                               \
         return f(ds, e[0], e[1], e[2], e[3]);                                  \
     }
+/* er8 and er10 are the 5th and 6th register arguments.  A shape of "zzzzzw"
+ * reaches er10 through e[5]; the leading zeroes keep the first four registers
+ * clear for routines that only read a high pair. */
+#define W5(f)                                                                  \
+    static uint16_t a_##f(uint8_t *ds, const uint16_t *e, const uint16_t *s)   \
+    {                                                                          \
+        (void)s;                                                               \
+        return f(ds, e[0], e[1], e[2], e[3], e[4]);                            \
+    }
+#define W6(f)                                                                  \
+    static uint16_t a_##f(uint8_t *ds, const uint16_t *e, const uint16_t *s)   \
+    {                                                                          \
+        (void)s;                                                               \
+        return f(ds, e[0], e[1], e[2], e[3], e[4], e[5]);                      \
+    }
 #define W1S1(f)                                                                \
     static uint16_t a_##f(uint8_t *ds, const uint16_t *e, const uint16_t *s)   \
     {                                                                          \
