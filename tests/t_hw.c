@@ -26,6 +26,13 @@ W1(record_nibble_predicate)
 W0(parked_word_fc1d_or_fc21)
 W0(parked_word_fc1c_or_fc20)
 W1(byte_166_167_192)
+W1(record_marker_25_27_28)
+W1(value_fc3e_fc1e_fc1f)
+W1(value_165_or_fb01_fb05)
+W1(value_in_fc10_fc1b)
+W1(value_in_fc28_fc2c)
+W1(digit_or_sign_predicate)
+W1(write_marker_2f76e)
 W0(mode136_screen_state)
 W0(cursor_rows_init)
 W0(row_limit_for_mode)
@@ -452,6 +459,13 @@ void test_hw(void)
         {"parked_word_fc1d_fc21", 0x24BBE, "", a_parked_word_fc1d_or_fc21, 0},
         {"parked_word_fc1c_fc20", 0x0D64E, "", a_parked_word_fc1c_or_fc20, 0},
         {"byte_166_167_192", 0x0D5E0, "w", a_byte_166_167_192, 0},
+        {"record_marker_25_27_28", 0x0C7B0, "p", a_record_marker_25_27_28, 0},
+        {"value_fc3e_fc1e_fc1f", 0x25010, "w", a_value_fc3e_fc1e_fc1f, 0},
+        {"value_165_or_fb01_fb05", 0x2F7E4, "w", a_value_165_or_fb01_fb05, 0},
+        {"value_in_fc10_fc1b", 0x1FFE6, "w", a_value_in_fc10_fc1b, 0},
+        {"value_in_fc28_fc2c", 0x2B986, "w", a_value_in_fc28_fc2c, 0},
+        {"digit_or_sign_predicate", 0x15E36, "p", a_digit_or_sign_predicate, 0},
+        {"write_marker_2f76e", 0x2F76E, "p", a_write_marker_2f76e, 0},
     );
 
     test_pop_pc_return();

@@ -837,3 +837,71 @@ uint16_t byte_166_167_192(uint8_t *ds, uint16_t arg)
     return (uint16_t)((arg & 0xFF00u) |
                       (v == 166u || v == 167u || v == 192u));
 }
+
+/* 0x0C7B0 - the two-byte marker at the pointer (25, 27 or 28). */
+uint16_t record_marker_25_27_28(uint8_t *ds, uint16_t ptr)
+{
+    uint16_t high = (uint16_t)(ptr & 0xFF00u);
+    uint8_t hit = (ds[ptr] == 25u &&
+                   (ds[(uint16_t)(ptr + 1)] == 27u ||
+                    ds[(uint16_t)(ptr + 1)] == 28u));
+
+    return (uint16_t)(high | hit);
+}
+
+/* 0x25010 - the argument itself is 0xFC3E, 0xFC1E or 0xFC1F.  The `cmpc r1,
+ * 252` compares er0's high byte; only r0 is overwritten on the way out, so the
+ * caller's high half survives into the answer. */
+uint16_t value_fc3e_fc1e_fc1f(uint8_t *ds, uint16_t arg)
+{
+    (void)ds;
+    uint8_t hit = (arg == 0xFC3Eu || arg == 0xFC1Eu || arg == 0xFC1Fu);
+
+    return (uint16_t)((arg & 0xFF00u) | hit);
+}
+
+/* 0x2F7E4 - 165, or the small 0xFB01..0xFB05 window. */
+uint16_t value_165_or_fb01_fb05(uint8_t *ds, uint16_t arg)
+{
+    (void)ds;
+    uint8_t hit = (arg == 165u || (arg >= 0xFB01u && arg <= 0xFB05u));
+
+    return (uint16_t)((arg & 0xFF00u) | hit);
+}
+
+/* 0x1FFE6 / 0x2B986 - the argument in a narrow 0xFCxx window.  The `mov r1,
+ * 252` before the compare leaves 0xFC in the answer's high half; only r0 is
+ * overwritten with the byte result. */
+uint16_t value_in_fc10_fc1b(uint8_t *ds, uint16_t arg)
+{
+    (void)ds;
+    uint8_t hit = (arg >= 0xFC10u && arg <= 0xFC1Bu);
+    return (uint16_t)(0xFC00u | hit);
+}
+
+uint16_t value_in_fc28_fc2c(uint8_t *ds, uint16_t arg)
+{
+    (void)ds;
+    uint8_t hit = (arg >= 0xFC28u && arg <= 0xFC2Cu);
+    return (uint16_t)(0xFC00u | hit);
+}
+
+/* 0x15E36 - the byte at the pointer is 45/46 or a digit in 48..57.  `l r1,[er0]`
+ * loads that byte into r1, which then becomes the answer's high half. */
+uint16_t digit_or_sign_predicate(uint8_t *ds, uint16_t ptr)
+{
+    uint8_t v = ds[ptr];
+    uint8_t hit = (v == 45u || v == 46u || (v >= 48u && v <= 57u));
+
+    return (uint16_t)(((uint16_t)v << 8) | hit);
+}
+
+/* 0x2F76E - write a two-byte marker to the caller's pointer: 136/0 when the
+ * 0xD13F flag is clear, 172/0 when set.  The pointer itself comes back in er0
+ * (`mov er0, er8` reloads both halves just before `pop er8`). */
+uint16_t write_marker_2f76e(uint8_t *ds, uint16_t ptr)
+{
+    ds[ptr] = (ds[0xD13F] != 0) ? 172u : 136u;
+    ds[(uint16_t)(ptr + 1)] = 0;
+    return ptr;
+}

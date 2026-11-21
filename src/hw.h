@@ -181,5 +181,12 @@ uint16_t record_nibble_predicate(uint8_t *ds, uint16_t ptr);
 uint16_t parked_word_fc1d_or_fc21(uint8_t *ds);
 uint16_t parked_word_fc1c_or_fc20(uint8_t *ds);
 uint16_t byte_166_167_192(uint8_t *ds, uint16_t arg);
+uint16_t record_marker_25_27_28(uint8_t *ds, uint16_t ptr);
+uint16_t value_fc3e_fc1e_fc1f(uint8_t *ds, uint16_t arg);
+uint16_t value_165_or_fb01_fb05(uint8_t *ds, uint16_t arg);
+uint16_t value_in_fc10_fc1b(uint8_t *ds, uint16_t arg);
+uint16_t value_in_fc28_fc2c(uint8_t *ds, uint16_t arg);
+uint16_t digit_or_sign_predicate(uint8_t *ds, uint16_t ptr);
+uint16_t write_marker_2f76e(uint8_t *ds, uint16_t ptr);
 
 #endif
