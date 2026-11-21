@@ -60,6 +60,8 @@ W2(init_record_kind_1d986)
 W1(copy_record_by_bytes)
 W1(init_record_2244a)
 W2(copy_table_to_d010)
+W2(copy_table_to_d010_1bcb2)
+W1(screen_buffer_threshold)
 W0(mode136_screen_state)
 W0(cursor_rows_init)
 W0(row_limit_for_mode)
@@ -520,6 +522,8 @@ void test_hw(void)
         {"copy_record_by_bytes", 0x17F32, "w", a_copy_record_by_bytes, 0},
         {"init_record_2244a", 0x2244A, "w", a_init_record_2244a, 0},
         {"copy_table_to_d010", 0x1BC7C, "zw", a_copy_table_to_d010, 0},
+        {"copy_table_to_d010_1bcb2", 0x1BCB2, "zw", a_copy_table_to_d010_1bcb2, 0},
+        {"screen_buffer_threshold", 0x0C784, "w", a_screen_buffer_threshold, 0},
     );
 
     test_pop_pc_return();

@@ -222,5 +222,7 @@ uint16_t init_record_kind_1d986(uint8_t *ds, uint16_t dst, uint16_t kind);
 uint16_t copy_record_by_bytes(uint8_t *ds, uint16_t arg);
 uint16_t init_record_2244a(uint8_t *ds, uint16_t arg);
 uint16_t copy_table_to_d010(uint8_t *ds, uint16_t unused, uint16_t kind);
+uint16_t copy_table_to_d010_1bcb2(uint8_t *ds, uint16_t unused, uint16_t kind);
+uint16_t screen_buffer_threshold(uint8_t *ds, uint16_t arg);
 
 #endif

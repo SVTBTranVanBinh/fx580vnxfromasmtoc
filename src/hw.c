@@ -1226,6 +1226,42 @@ uint16_t init_record_2244a(uint8_t *ds, uint16_t arg)
  * entry 18).  The final `l r0,[0xD010]` is a byte load, so r1 still holds the
  * second byte of the *source* record and the answer is that byte above the old
  * 0xD010 byte. */
+/* 0x1BCB2 - the same table-into-0xD010 copy as 0x1BC7C, with a different table
+ * base and a clamped index.  A kind of 0 or >= 11 uses slot 9. */
+uint16_t copy_table_to_d010_1bcb2(uint8_t *ds, uint16_t unused, uint16_t kind)
+{
+    uint8_t k = (uint8_t)kind;
+
+    (void)unused;
+    if (k == 0u || k >= 11u)
+        k = 10u;
+    k = (uint8_t)(k - 1u);
+
+    uint16_t src = (uint16_t)(0x1D38u + (uint16_t)k * 10u);
+    uint8_t old = ds[0xD010];
+
+    ds_put(ds, 0xD010u, old);
+    for (int i = 1; i < 10; i++)
+        ds_put(ds, (uint16_t)(0xD010u + i), ds[(uint16_t)(src + i)]);
+    return (uint16_t)(((uint16_t)ds[(uint16_t)(src + 1)] << 8) | old);
+}
+
+/* 0x0C784 - is er0 at or above a screen buffer threshold?  The `mov r1,248/221`
+ * before the compare leaves the threshold's high byte in the answer. */
+uint16_t screen_buffer_threshold(uint8_t *ds, uint16_t arg)
+{
+    if (ds[0xD139] == 0u)
+        return (uint16_t)(0xF800u | (arg >= 0xF800u));
+
+    /* Two bounds: below 0xDDD4 answers 0xDD00, above 0xE3D4 answers 0xE300,
+     * and the band between them answers 0xE301. */
+    if (arg < 0xDDD4u)
+        return 0xDD00u;
+    if (arg > 0xE3D4u)
+        return 0xE300u;
+    return 0xE301u;
+}
+
 uint16_t copy_table_to_d010(uint8_t *ds, uint16_t unused, uint16_t kind)
 {
     uint16_t src;
