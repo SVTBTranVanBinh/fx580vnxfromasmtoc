@@ -50,6 +50,8 @@ W1(abs_diff_d00e)
 W1(table_byte_ffdf)
 W2(copy_160_to_pointer)
 W2(store_scaled_nibble)
+W1(string_cell_count)
+W6(read_word_d05e)
 W0(mode136_screen_state)
 W0(cursor_rows_init)
 W0(row_limit_for_mode)
@@ -500,6 +502,8 @@ void test_hw(void)
         {"table_byte_ffdf", 0x10E3A, "w", a_table_byte_ffdf, 0},
         {"copy_160_to_pointer", 0x26B00, "ww", a_copy_160_to_pointer, 0},
         {"store_scaled_nibble", 0x0D4FA, "wp", a_store_scaled_nibble, 0},
+        {"string_cell_count", 0x0E5E6, "p", a_string_cell_count, 0},
+        {"read_word_d05e", 0x16D6C, "zzzzzw", a_read_word_d05e, 0},
     );
 
     test_pop_pc_return();

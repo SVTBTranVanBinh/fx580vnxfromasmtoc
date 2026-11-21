@@ -1113,3 +1113,37 @@ uint16_t store_scaled_nibble(uint8_t *ds, uint16_t arg, uint16_t ptr)
     return 0;
 }
 
+/* 0x0E5E6 - walk a zero-terminated byte string from er0 and count the cells.
+ * A byte of 4 or >= 240 is a two-byte cell (the extra byte is skipped) but
+ * still counts as one. */
+uint16_t string_cell_count(uint8_t *ds, uint16_t ptr)
+{
+    uint16_t p = ptr;
+    uint16_t count = 0;
+
+    for (;;) {
+        uint8_t b = ds[p];
+
+        if (b == 0u)
+            return count;
+        p = (uint16_t)(p + 1u);
+        if (b == 4u || b >= 240u)
+            p = (uint16_t)(p + 1u);
+        count = (uint16_t)(count + 1u);
+    }
+}
+
+/* 0x16D6C - read a word from 0xD05E + er10*2 (byte-wide arithmetic carrying
+ * into r9); er0 is never written, so the caller's word comes straight back. */
+uint16_t read_word_d05e(uint8_t *ds, uint16_t a, uint16_t b, uint16_t c,
+                        uint16_t d, uint16_t e, uint16_t er10)
+{
+    (void)b; (void)c; (void)d; (void)e;
+    uint16_t off = (uint16_t)((uint8_t)er10 * 2u);
+    uint16_t addr = (uint16_t)(0xD05Eu + off);
+
+    (void)ds[addr];
+    (void)ds[(uint16_t)(addr + 1)];
+    return a;
+}
+
