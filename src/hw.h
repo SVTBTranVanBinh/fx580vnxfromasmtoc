@@ -210,5 +210,13 @@ uint16_t string_cell_count(uint8_t *ds, uint16_t ptr);
 uint16_t read_word_d05e(uint8_t *ds, uint16_t a, uint16_t b, uint16_t c,
                         uint16_t d, uint16_t e, uint16_t er10);
 uint16_t row_count_09cc4(uint8_t *ds);
+uint16_t or_all_registers(uint8_t *ds, uint16_t e0, uint16_t e1, uint16_t e2,
+                          uint16_t e3, uint16_t e4, uint16_t e5, uint16_t e6,
+                          uint16_t e7);
+uint16_t token_if_er8_nonzero(uint8_t *ds, uint16_t arg0, uint16_t z1,
+                              uint16_t z2, uint16_t z3, uint16_t er8);
+uint16_t copy_record_er6_to_er10(uint8_t *ds, uint16_t a, uint16_t b,
+                                 uint16_t c, uint16_t er6, uint16_t e,
+                                 uint16_t er10);
 
 #endif

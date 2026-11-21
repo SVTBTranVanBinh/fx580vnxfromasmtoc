@@ -1147,6 +1147,38 @@ uint16_t read_word_d05e(uint8_t *ds, uint16_t a, uint16_t b, uint16_t c,
     return a;
 }
 
+/* 0x1A5C0 - OR the second register bank into the first, byte by byte: r0|=r8,
+ * r1|=r9, r2|=r10, ... r7|=r15.  The batch runner only watches er0, which is
+ * the OR of e[0] and e[4] (the two halves contributed by r0/r1 and r8/r9). */
+uint16_t or_all_registers(uint8_t *ds, uint16_t e0, uint16_t e1, uint16_t e2,
+                          uint16_t e3, uint16_t e4, uint16_t e5, uint16_t e6,
+                          uint16_t e7)
+{
+    (void)ds; (void)e1; (void)e2; (void)e3; (void)e5; (void)e6; (void)e7;
+    return (uint16_t)(e0 | e4);
+}
+
+/* 0x13B6E - a nonzero er8 (both halves) selects the fixed 0xD392 token;
+ * otherwise the caller's er0 comes straight back. */
+uint16_t token_if_er8_nonzero(uint8_t *ds, uint16_t arg0, uint16_t z1,
+                              uint16_t z2, uint16_t z3, uint16_t er8)
+{
+    (void)ds; (void)z1; (void)z2; (void)z3;
+    if ((uint8_t)er8 == 0u || (uint8_t)(er8 >> 8) == 0u)
+        return arg0;
+    return 0xD392u;
+}
+
+/* 0x14450 - a tail call into 0x13ACC's shared copy: the source is er6, the
+ * destination er10, and the ten-byte copy answers with the destination. */
+uint16_t copy_record_er6_to_er10(uint8_t *ds, uint16_t a, uint16_t b,
+                                 uint16_t c, uint16_t er6, uint16_t e,
+                                 uint16_t er10)
+{
+    (void)a; (void)b; (void)c; (void)e;
+    return record10_er8_from_er4(ds, er6, er10);
+}
+
 /* 0x09CC4 - a row count from the mode/submode and one extra state byte.  The
  * last `l r1,[0xD121]` sets Z from the byte it loads, so a zero byte skips the
  * final increment.  Only r0 is written, so with a clean er1 the answer is the
