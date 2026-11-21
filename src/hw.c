@@ -1079,3 +1079,37 @@ uint16_t abs_diff_d00e(uint8_t *ds, uint16_t arg)
     return arg < w ? (uint16_t)(w - arg) : (uint16_t)(arg - w);
 }
 
+/* 0x10E3A - the apparent `l r0, 3:[er14]` answers the literal 3 in the low
+ * half regardless of the data space (the 0x90E0 extension makes the effective
+ * read hit the immediate, not RAM).  Only r0 is written, so the caller's r1
+ * survives into the high half. */
+uint16_t table_byte_ffdf(uint8_t *ds, uint16_t arg)
+{
+    (void)ds;
+    return (uint16_t)((arg & 0xFF00u) | 3u);
+}
+
+/* 0x26B00 - copy 160 bytes from er2 into the pointer in er0, then answer 1.
+ * The count is passed as a stacked word, which is how the batch harness feeds
+ * memcpy_nn its fourth argument. */
+uint16_t copy_160_to_pointer(uint8_t *ds, uint16_t dst, uint16_t src)
+{
+    (void)memcpy_nn(ds, dst, src, 160u);
+    /* memcpy_nn answers in er0 with dst; the trailing `mov r0,1` overwrites
+     * only the low half, so the destination's high byte survives. */
+    return (uint16_t)((dst & 0xFF00u) | 1u);
+}
+
+/* 0x0D4FA - a nibble of the byte at er0, times 160, plus 0xD392, stored as a
+ * word at er2.  The routine answers 0. */
+uint16_t store_scaled_nibble(uint8_t *ds, uint16_t arg, uint16_t ptr)
+{
+    uint16_t v = (uint16_t)((uint16_t)(ds[arg] & 0x0Fu) * 160u);
+    uint16_t p = (uint16_t)(ptr & 0xFFFEu);
+
+    v = (uint16_t)(v + 0xD392u);
+    ds_put(ds, p, (uint8_t)v);
+    ds_put(ds, (uint16_t)(p + 1), (uint8_t)(v >> 8));
+    return 0;
+}
+

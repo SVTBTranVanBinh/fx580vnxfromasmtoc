@@ -47,6 +47,9 @@ W1(value_64_or_66_73)
 W1(ranges_16c8e)
 W1(state_d019_ge_10)
 W1(abs_diff_d00e)
+W1(table_byte_ffdf)
+W2(copy_160_to_pointer)
+W2(store_scaled_nibble)
 W0(mode136_screen_state)
 W0(cursor_rows_init)
 W0(row_limit_for_mode)
@@ -494,6 +497,9 @@ void test_hw(void)
         {"ranges_16c8e", 0x16C8E, "w", a_ranges_16c8e, 0},
         {"state_d019_ge_10", 0x1B698, "w", a_state_d019_ge_10, 0},
         {"abs_diff_d00e", 0x0C1D0, "w", a_abs_diff_d00e, 0},
+        {"table_byte_ffdf", 0x10E3A, "w", a_table_byte_ffdf, 0},
+        {"copy_160_to_pointer", 0x26B00, "ww", a_copy_160_to_pointer, 0},
+        {"store_scaled_nibble", 0x0D4FA, "wp", a_store_scaled_nibble, 0},
     );
 
     test_pop_pc_return();

@@ -203,5 +203,8 @@ uint16_t value_64_or_66_73(uint8_t *ds, uint16_t ptr);
 uint16_t ranges_16c8e(uint8_t *ds, uint16_t arg);
 uint16_t state_d019_ge_10(uint8_t *ds, uint16_t arg);
 uint16_t abs_diff_d00e(uint8_t *ds, uint16_t arg);
+uint16_t table_byte_ffdf(uint8_t *ds, uint16_t arg);
+uint16_t copy_160_to_pointer(uint8_t *ds, uint16_t dst, uint16_t src);
+uint16_t store_scaled_nibble(uint8_t *ds, uint16_t arg, uint16_t ptr);
 
 #endif
