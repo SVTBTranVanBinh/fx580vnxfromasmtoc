@@ -188,5 +188,9 @@ uint16_t value_in_fc10_fc1b(uint8_t *ds, uint16_t arg);
 uint16_t value_in_fc28_fc2c(uint8_t *ds, uint16_t arg);
 uint16_t digit_or_sign_predicate(uint8_t *ds, uint16_t ptr);
 uint16_t write_marker_2f76e(uint8_t *ds, uint16_t ptr);
+uint16_t display_arm_sequence(uint8_t *ds);
+uint16_t digit_byte_at_pointer(uint8_t *ds, uint16_t ptr);
+uint16_t table_lookup_d0f8(uint8_t *ds, uint16_t a, uint16_t b, uint16_t c);
+uint16_t triangular_from_arg(uint8_t *ds, uint16_t arg);
 
 #endif

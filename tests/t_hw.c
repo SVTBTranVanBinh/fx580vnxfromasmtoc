@@ -33,6 +33,10 @@ W1(value_in_fc10_fc1b)
 W1(value_in_fc28_fc2c)
 W1(digit_or_sign_predicate)
 W1(write_marker_2f76e)
+W0(display_arm_sequence)
+W1(digit_byte_at_pointer)
+W3(table_lookup_d0f8)
+W1(triangular_from_arg)
 W0(mode136_screen_state)
 W0(cursor_rows_init)
 W0(row_limit_for_mode)
@@ -466,6 +470,10 @@ void test_hw(void)
         {"value_in_fc28_fc2c", 0x2B986, "w", a_value_in_fc28_fc2c, 0},
         {"digit_or_sign_predicate", 0x15E36, "p", a_digit_or_sign_predicate, 0},
         {"write_marker_2f76e", 0x2F76E, "p", a_write_marker_2f76e, 0},
+        {"display_arm_sequence", 0x0A0DA, "", a_display_arm_sequence, 0},
+        {"digit_byte_at_pointer", 0x1F41E, "p", a_digit_byte_at_pointer, 0},
+        {"table_lookup_d0f8", 0x13B5A, "zzw", a_table_lookup_d0f8, 0},
+        {"triangular_from_arg", 0x0D80C, "w", a_triangular_from_arg, 0},
     );
 
     test_pop_pc_return();

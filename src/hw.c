@@ -905,3 +905,56 @@ uint16_t write_marker_2f76e(uint8_t *ds, uint16_t ptr)
     ds[(uint16_t)(ptr + 1)] = 0;
     return ptr;
 }
+
+/* 0x0A0DA - a fixed burst of SFR pokes that arms the display.  `mov er0,4`
+ * zeroes r1, so the trailing `st r1,[0xF039]` writes 0 and the final er0 is
+ * just the low byte 21. */
+uint16_t display_arm_sequence(uint8_t *ds)
+{
+    ds[0xF00A] = 1;
+    ds[0xF030] = 4;
+    ds[0xF033] = 3;
+    ds[0xF034] = 9;
+    ds[0xF035] = 23;
+    ds[0xF036] = 1;
+    ds[0xF039] = 0;
+    ds[0xF031] = 21;
+    return 21;
+}
+
+/* 0x1F41E - the byte at the pointer is an ASCII digit.  `mov er0,0/1` reloads
+ * both halves, so the caller's r1 does not survive here. */
+uint16_t digit_byte_at_pointer(uint8_t *ds, uint16_t ptr)
+{
+    return (ds[ptr] >= 48u && ds[ptr] <= 57u) ? 1u : 0u;
+}
+
+/* 0x13B5A - a table lookup: the low nibble of er4 selects a word from the
+ * 0xD0F8 table (two bytes per entry).  r4 and r6 are masked as a side effect,
+ * but only the lookup result in er0 is observable to the batch runner. */
+uint16_t table_lookup_d0f8(uint8_t *ds, uint16_t a, uint16_t b, uint16_t c)
+{
+    (void)ds; (void)a; (void)b;
+    return (uint16_t)(0xD0F8u + ((c & 0x0Fu) << 1));
+}
+
+/* 0x0D80C - walk er0 up 1, 4, 13, 40, 121, 364, ... (er4 = previous er0,
+ * er0 = 3*er4, plus one while er4 < er6) and stop once er4 reaches the
+ * argument's *low byte* zero-extended.  `mov er6, er0` here is a byte move, so
+ * the argument's high byte is ignored; `mov r0, r4` writes only the low half of
+ * the answer and the high half is the high byte of the final er0. */
+uint16_t triangular_from_arg(uint8_t *ds, uint16_t arg)
+{
+    (void)ds;
+    uint16_t tgt = (uint16_t)(arg & 0xFFu);
+    uint16_t er0 = 1;
+
+    for (;;) {
+        uint16_t er4 = er0;
+        er0 = (uint16_t)(er0 + er0 + er4);
+        if (er4 >= tgt)
+            return (uint16_t)((er0 & 0xFF00u) | (er4 & 0xFFu));
+        er0 = (uint16_t)(er0 + 1u);
+    }
+}
+
