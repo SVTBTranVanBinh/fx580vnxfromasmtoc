@@ -174,4 +174,12 @@ uint16_t init_state_buffers(uint8_t *ds, uint16_t arg);
 /* 0x1841E - initialise three consecutive variable records (kinds 0, 0, 1). */
 uint16_t init_three_var_records(uint8_t *ds, uint16_t arg);
 
+/* small predicates */
+uint16_t record_pair_marker(uint8_t *ds, uint16_t ptr);
+uint16_t armed_35_or_zero(uint8_t *ds, uint16_t arg);
+uint16_t record_nibble_predicate(uint8_t *ds, uint16_t ptr);
+uint16_t parked_word_fc1d_or_fc21(uint8_t *ds);
+uint16_t parked_word_fc1c_or_fc20(uint8_t *ds);
+uint16_t byte_166_167_192(uint8_t *ds, uint16_t arg);
+
 #endif

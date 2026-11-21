@@ -774,3 +774,66 @@ uint16_t init_three_var_records(uint8_t *ds, uint16_t arg)
     }
     return out;
 }
+
+/* 0x24F26 - the two-byte marker at the pointer (201, 26).  Only r0 is reloaded
+ * from memory, so the pointer's own high byte survives in the answer. */
+uint16_t record_pair_marker(uint8_t *ds, uint16_t ptr)
+{
+    uint16_t high = (uint16_t)(ptr & 0xFF00u);
+    uint8_t hit = (ds[ptr] == 201u && ds[(uint16_t)(ptr + 1)] == 26u);
+
+    return (uint16_t)(high | hit);
+}
+
+/* 0x2847C - bit 6 of the state byte arms the 35 test; er0 == 0 is always an
+ * independent yes (the `mov er0, er0` at 0x2848C is a 16-bit zero test). */
+uint16_t armed_35_or_zero(uint8_t *ds, uint16_t arg)
+{
+    uint16_t high = (uint16_t)(arg & 0xFF00u);
+    uint8_t hit = (arg == 0u) ||
+                  ((ds[0xD116] & 0x40u) != 0 && arg == 35u);
+
+    return (uint16_t)(high | hit);
+}
+
+/* 0x1DD44 - a record byte whose low nibble is < 10 and whose +9 byte has a
+ * clear high nibble.  The pointer's high byte survives into the answer. */
+uint16_t record_nibble_predicate(uint8_t *ds, uint16_t ptr)
+{
+    uint16_t high = (uint16_t)(ptr & 0xFF00u);
+    uint8_t hit = 1u;
+
+    if ((ds[ptr] & 0x0Fu) < 10u && (ds[(uint16_t)(ptr + 9)] & 0xF0u) == 0u)
+        hit = 0u;
+    return (uint16_t)(high | hit);
+}
+
+/* 0x24BBE / 0x0D64E - the parked word at 0xD10E.  `l er0,[0xD10E]` loads both
+ * halves of er0, and the final `mov r0,1/0` touches only the low half, so the
+ * answer's high byte is the parked word's own high byte (normally 0xFC). */
+uint16_t parked_word_fc1d_or_fc21(uint8_t *ds)
+{
+    uint16_t word = (uint16_t)(ds[0xD10E] | ((uint16_t)ds[0xD10F] << 8));
+    uint8_t hit = (word == 0xFC1Du || word == 0xFC21u);
+
+    return (uint16_t)(((uint16_t)ds[0xD10F] << 8) | hit);
+}
+
+uint16_t parked_word_fc1c_or_fc20(uint8_t *ds)
+{
+    uint16_t word = (uint16_t)(ds[0xD10E] | ((uint16_t)ds[0xD10F] << 8));
+    uint8_t hit = (word == 0xFC1Cu || word == 0xFC20u);
+
+    return (uint16_t)(((uint16_t)ds[0xD10F] << 8) | hit);
+}
+
+/* 0x0D5E0 - byte 166, 167 or 192.  r1 is never written, so the caller's high
+ * half comes back beside the byte-sized answer. */
+uint16_t byte_166_167_192(uint8_t *ds, uint16_t arg)
+{
+    (void)ds;
+    uint8_t v = (uint8_t)arg;
+
+    return (uint16_t)((arg & 0xFF00u) |
+                      (v == 166u || v == 167u || v == 192u));
+}

@@ -20,6 +20,12 @@ W0(display_flags_from_modifiers)
 W1(submode_setup_gate)
 W1(init_state_buffers)
 W1(init_three_var_records)
+W1(record_pair_marker)
+W1(armed_35_or_zero)
+W1(record_nibble_predicate)
+W0(parked_word_fc1d_or_fc21)
+W0(parked_word_fc1c_or_fc20)
+W1(byte_166_167_192)
 W0(mode136_screen_state)
 W0(cursor_rows_init)
 W0(row_limit_for_mode)
@@ -440,6 +446,12 @@ void test_hw(void)
         {"submode_setup_gate", 0x24B10, "w", a_submode_setup_gate, 0},
         {"init_state_buffers", 0x09E4E, "w", a_init_state_buffers, 0},
         {"init_three_var_records", 0x1841E, "w", a_init_three_var_records, 0},
+        {"record_pair_marker", 0x24F26, "p", a_record_pair_marker, 0},
+        {"armed_35_or_zero", 0x2847C, "w", a_armed_35_or_zero, 0},
+        {"record_nibble_predicate", 0x1DD44, "p", a_record_nibble_predicate, 0},
+        {"parked_word_fc1d_fc21", 0x24BBE, "", a_parked_word_fc1d_or_fc21, 0},
+        {"parked_word_fc1c_fc20", 0x0D64E, "", a_parked_word_fc1c_or_fc20, 0},
+        {"byte_166_167_192", 0x0D5E0, "w", a_byte_166_167_192, 0},
     );
 
     test_pop_pc_return();
