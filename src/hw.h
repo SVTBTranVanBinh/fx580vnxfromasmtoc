@@ -209,5 +209,6 @@ uint16_t store_scaled_nibble(uint8_t *ds, uint16_t arg, uint16_t ptr);
 uint16_t string_cell_count(uint8_t *ds, uint16_t ptr);
 uint16_t read_word_d05e(uint8_t *ds, uint16_t a, uint16_t b, uint16_t c,
                         uint16_t d, uint16_t e, uint16_t er10);
+uint16_t row_count_09cc4(uint8_t *ds);
 
 #endif

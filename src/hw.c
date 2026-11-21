@@ -1147,3 +1147,24 @@ uint16_t read_word_d05e(uint8_t *ds, uint16_t a, uint16_t b, uint16_t c,
     return a;
 }
 
+/* 0x09CC4 - a row count from the mode/submode and one extra state byte.  The
+ * last `l r1,[0xD121]` sets Z from the byte it loads, so a zero byte skips the
+ * final increment.  Only r0 is written, so with a clean er1 the answer is the
+ * plain count. */
+uint16_t row_count_09cc4(uint8_t *ds)
+{
+    uint8_t mode = ds[MEM_MODE];
+
+    /* Each exit keeps whatever r1 the last `l r1,[...]` loaded: the mode byte
+     * on the two early exits, the 0xD121 byte on the general path. */
+    if (mode == 136u || mode == 12u)
+        return (uint16_t)(((uint16_t)mode << 8) | 2u);
+
+    uint16_t r0 = (ds[0xD112] == 1u) ? 1u : 2u;
+    uint8_t last = ds[0xD121];
+
+    if (last == 0u)
+        return r0;
+    return (uint16_t)(((uint16_t)last << 8) | (r0 + 1u));
+}
+

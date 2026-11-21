@@ -52,6 +52,7 @@ W2(copy_160_to_pointer)
 W2(store_scaled_nibble)
 W1(string_cell_count)
 W6(read_word_d05e)
+W0(row_count_09cc4)
 W0(mode136_screen_state)
 W0(cursor_rows_init)
 W0(row_limit_for_mode)
@@ -504,6 +505,7 @@ void test_hw(void)
         {"store_scaled_nibble", 0x0D4FA, "wp", a_store_scaled_nibble, 0},
         {"string_cell_count", 0x0E5E6, "p", a_string_cell_count, 0},
         {"read_word_d05e", 0x16D6C, "zzzzzw", a_read_word_d05e, 0},
+        {"row_count_09cc4", 0x09CC4, "", a_row_count_09cc4, 0},
     );
 
     test_pop_pc_return();
